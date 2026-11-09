@@ -1,0 +1,21 @@
+// use prisma-8
+
+model User {
+  id        Int                @id @default(autoincrement())
+  email     String             @unique
+  username  String?
+  name      String?
+  pages     Page[]
+  createdAt DateTime           @default(now()) @onCreate(now())
+  updatedAt temporal.UpdatedAt
+}
+
+model Page {
+  id        Int                @id @default(autoincrement())
+  title     String
+  url       String?
+  author    User               @relation(fields: [authorId], references: [id])
+  authorId  Int
+  createdAt DateTime           @default(now()) @onCreate(now())
+  updatedAt temporal.UpdatedAt
+}

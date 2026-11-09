@@ -1,0 +1,22 @@
+{
+  "name": "@repo/db-prisma",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/prisma/*.ts"
+  },
+  "scripts": {
+    "contract:emit": "prisma contract emit"
+  },
+  "dependencies": {
+    "@prisma/orm-postgres": "^8.0.0-rc.23",
+    "dotenv": "^18.0.9",
+    "@repo/typescript-config": "*"
+  },
+  "devDependencies": {
+    "@prisma/cli-engine": "0.9.0",
+    "@types/node": "^26.6.6",
+    "prisma": "^8.0.0-rc.33"
+  }
+}
