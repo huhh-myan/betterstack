@@ -4,38 +4,48 @@
   "target": "postgres",
   "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
-    "Page": {
-      "model": "Page",
+    "Region": {
+      "model": "Region",
       "namespace": "public"
     },
     "User": {
       "model": "User",
+      "namespace": "public"
+    },
+    "Website": {
+      "model": "Website",
+      "namespace": "public"
+    },
+    "WebsiteTicks": {
+      "model": "WebsiteTicks",
       "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
       "public": {
+        "enum": {
+          "status": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "Up",
+                "value": "Up"
+              },
+              {
+                "name": "Down",
+                "value": "Down"
+              },
+              {
+                "name": "Unknown",
+                "value": "Unknown"
+              }
+            ]
+          }
+        },
         "models": {
-          "Page": {
+          "Region": {
             "fields": {
-              "authorId": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/int4@1",
-                  "kind": "scalar"
-                }
-              },
-              "createdAt": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/timestamptz-date@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "precision": 3
-                  }
-                }
-              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -43,25 +53,8 @@
                   "kind": "scalar"
                 }
               },
-              "title": {
+              "name": {
                 "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "updatedAt": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/timestamptz-date@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "precision": 3
-                  }
-                }
-              },
-              "url": {
-                "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
@@ -69,46 +62,33 @@
               }
             },
             "relations": {
-              "author": {
-                "cardinality": "N:1",
-                "nullable": false,
+              "ticks": {
+                "cardinality": "1:N",
                 "on": {
                   "localFields": [
-                    "authorId"
+                    "id"
                   ],
                   "targetFields": [
-                    "id"
+                    "region_id"
                   ]
                 },
                 "to": {
-                  "model": "User",
+                  "model": "WebsiteTicks",
                   "namespace": "public"
                 }
               }
             },
             "storage": {
               "fields": {
-                "authorId": {
-                  "column": "authorId"
-                },
-                "createdAt": {
-                  "column": "createdAt"
-                },
                 "id": {
                   "column": "id"
                 },
-                "title": {
-                  "column": "title"
-                },
-                "updatedAt": {
-                  "column": "updatedAt"
-                },
-                "url": {
-                  "column": "url"
+                "name": {
+                  "column": "name"
                 }
               },
               "namespaceId": "public",
-              "table": "Page"
+              "table": "Region"
             }
           },
           "User": {
@@ -123,39 +103,22 @@
                   }
                 }
               },
-              "email": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/int4@1",
+                  "codecId": "pg/text@1",
                   "kind": "scalar"
                 }
               },
-              "name": {
-                "nullable": true,
+              "password": {
+                "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
                 }
               },
-              "updatedAt": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/timestamptz-date@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "precision": 3
-                  }
-                }
-              },
               "username": {
-                "nullable": true,
+                "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
@@ -163,18 +126,18 @@
               }
             },
             "relations": {
-              "pages": {
+              "websites": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
                     "id"
                   ],
                   "targetFields": [
-                    "authorId"
+                    "user_id"
                   ]
                 },
                 "to": {
-                  "model": "Page",
+                  "model": "Website",
                   "namespace": "public"
                 }
               }
@@ -184,17 +147,11 @@
                 "createdAt": {
                   "column": "createdAt"
                 },
-                "email": {
-                  "column": "email"
-                },
                 "id": {
                   "column": "id"
                 },
-                "name": {
-                  "column": "name"
-                },
-                "updatedAt": {
-                  "column": "updatedAt"
+                "password": {
+                  "column": "password"
                 },
                 "username": {
                   "column": "username"
@@ -202,6 +159,205 @@
               },
               "namespaceId": "public",
               "table": "User"
+            }
+          },
+          "Website": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "timeAdded": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 3
+                  }
+                }
+              },
+              "url": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "user_id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "ticks": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "website_id"
+                  ]
+                },
+                "to": {
+                  "model": "WebsiteTicks",
+                  "namespace": "public"
+                }
+              },
+              "user": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "user_id"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "timeAdded": {
+                  "column": "timeAdded"
+                },
+                "url": {
+                  "column": "url"
+                },
+                "user_id": {
+                  "column": "user_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "Website"
+            }
+          },
+          "WebsiteTicks": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 3
+                  }
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "region_id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "response_time_ms": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "status": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "status",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "website_id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "region": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "region_id"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Region",
+                  "namespace": "public"
+                }
+              },
+              "website": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "website_id"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Website",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "region_id": {
+                  "column": "region_id"
+                },
+                "response_time_ms": {
+                  "column": "response_time_ms"
+                },
+                "status": {
+                  "column": "status"
+                },
+                "website_id": {
+                  "column": "website_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "WebsiteTicks"
             }
           }
         }
@@ -213,40 +369,77 @@
       "public": {
         "entries": {
           "table": {
-            "Page": {
+            "Region": {
               "columns": {
-                "authorId": {
+                "id": {
                   "codecId": "pg/int4@1",
                   "dataType": "pg/int4",
                   "nullable": false
                 },
+                "name": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "User": {
+              "columns": {
                 "createdAt": {
                   "codecId": "pg/timestamptz-date@1",
                   "dataType": "pg/timestamptz",
-                  "default": {
-                    "expression": "now()",
-                    "kind": "function"
-                  },
                   "nullable": false,
                   "typeParams": {
                     "precision": 3
                   }
                 },
                 "id": {
-                  "codecId": "pg/int4@1",
-                  "dataType": "pg/int4",
-                  "default": {
-                    "expression": "autoincrement()",
-                    "kind": "function"
-                  },
-                  "nullable": false
-                },
-                "title": {
                   "codecId": "pg/text@1",
                   "dataType": "pg/text",
                   "nullable": false
                 },
-                "updatedAt": {
+                "password": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "username": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "username"
+                  ]
+                }
+              ]
+            },
+            "Website": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "timeAdded": {
                   "codecId": "pg/timestamptz-date@1",
                   "dataType": "pg/timestamptz",
                   "nullable": false,
@@ -257,20 +450,25 @@
                 "url": {
                   "codecId": "pg/text@1",
                   "dataType": "pg/text",
-                  "nullable": true
+                  "nullable": false
+                },
+                "user_id": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
                 }
               },
               "foreignKeys": [
                 {
                   "index": {
-                    "name": "Page_authorId_idx_e47547ed"
+                    "name": "Website_user_id_idx_6c952402"
                   },
                   "source": {
                     "columns": [
-                      "authorId"
+                      "user_id"
                     ],
                     "namespaceId": "public",
-                    "tableName": "Page"
+                    "tableName": "Website"
                   },
                   "target": {
                     "columns": [
@@ -284,10 +482,10 @@
               "indexes": [
                 {
                   "columns": [
-                    "authorId"
+                    "user_id"
                   ],
-                  "name": "Page_authorId_idx_e47547ed",
-                  "prefix": "Page_authorId_idx",
+                  "name": "Website_user_id_idx_6c952402",
+                  "prefix": "Website_user_id_idx",
                   "unique": false
                 }
               ],
@@ -298,7 +496,14 @@
               },
               "uniques": []
             },
-            "User": {
+            "WebsiteTicks": {
+              "checks": [
+                {
+                  "expression": "\"status\" IN ('Up', 'Down', 'Unknown')",
+                  "name": "WebsiteTicks_status_check_92990d30",
+                  "prefix": "WebsiteTicks_status_check"
+                }
+              ],
               "columns": {
                 "createdAt": {
                   "codecId": "pg/timestamptz-date@1",
@@ -312,52 +517,111 @@
                     "precision": 3
                   }
                 },
-                "email": {
-                  "codecId": "pg/text@1",
-                  "dataType": "pg/text",
-                  "nullable": false
-                },
                 "id": {
                   "codecId": "pg/int4@1",
                   "dataType": "pg/int4",
-                  "default": {
-                    "expression": "autoincrement()",
-                    "kind": "function"
-                  },
                   "nullable": false
                 },
-                "name": {
+                "region_id": {
+                  "codecId": "pg/int4@1",
+                  "dataType": "pg/int4",
+                  "nullable": false
+                },
+                "response_time_ms": {
+                  "codecId": "pg/int4@1",
+                  "dataType": "pg/int4",
+                  "nullable": false
+                },
+                "status": {
                   "codecId": "pg/text@1",
                   "dataType": "pg/text",
-                  "nullable": true
-                },
-                "updatedAt": {
-                  "codecId": "pg/timestamptz-date@1",
-                  "dataType": "pg/timestamptz",
                   "nullable": false,
-                  "typeParams": {
-                    "precision": 3
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "status",
+                    "namespaceId": "public",
+                    "plane": "storage"
                   }
                 },
-                "username": {
+                "website_id": {
                   "codecId": "pg/text@1",
                   "dataType": "pg/text",
-                  "nullable": true
+                  "nullable": false
                 }
               },
-              "foreignKeys": [],
-              "indexes": [],
+              "foreignKeys": [
+                {
+                  "index": {
+                    "name": "WebsiteTicks_region_id_idx_22635963"
+                  },
+                  "source": {
+                    "columns": [
+                      "region_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "WebsiteTicks"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Region"
+                  }
+                },
+                {
+                  "index": {
+                    "name": "WebsiteTicks_website_id_idx_cb828943"
+                  },
+                  "source": {
+                    "columns": [
+                      "website_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "WebsiteTicks"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Website"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "region_id"
+                  ],
+                  "name": "WebsiteTicks_region_id_idx_22635963",
+                  "prefix": "WebsiteTicks_region_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "website_id"
+                  ],
+                  "name": "WebsiteTicks_website_id_idx_cb828943",
+                  "prefix": "WebsiteTicks_website_id_idx",
+                  "unique": false
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
                 ]
               },
-              "uniques": [
-                {
-                  "columns": [
-                    "email"
-                  ]
-                }
+              "uniques": []
+            }
+          },
+          "valueSet": {
+            "status": {
+              "kind": "valueSet",
+              "values": [
+                "Up",
+                "Down",
+                "Unknown"
               ]
             }
           }
@@ -366,10 +630,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "a541cbcaa18af38abeff13dd668b9bee7a229c64e7f91dd1dfe09bff77a1bef2"
+    "storageHash": "7dbcca3cd7bb0fcb66cf35582cd753b68b9e00212084fdfde358e47504210921"
   },
   "execution": {
-    "executionHash": "9422d6de993283fdc6781b4338cc658345672b96e65d5b9f1cce68d585b37fb1",
+    "executionHash": "84ba3a20402209dcd120209490f64c08c3e1e6bc736de4315c9441eddffe46f6",
     "mutations": {
       "defaults": [
         {
@@ -381,41 +645,6 @@
             }
           },
           "ref": {
-            "entry": "Page",
-            "field": "createdAt",
-            "namespace": "public"
-          }
-        },
-        {
-          "onCreate": {
-            "id": "timestampNow",
-            "kind": "generator",
-            "params": {
-              "precision": 3
-            }
-          },
-          "onUpdate": {
-            "id": "timestampNow",
-            "kind": "generator",
-            "params": {
-              "precision": 3
-            }
-          },
-          "ref": {
-            "entry": "Page",
-            "field": "updatedAt",
-            "namespace": "public"
-          }
-        },
-        {
-          "onCreate": {
-            "id": "timestampNow",
-            "kind": "generator",
-            "params": {
-              "precision": 3
-            }
-          },
-          "ref": {
             "entry": "User",
             "field": "createdAt",
             "namespace": "public"
@@ -423,13 +652,28 @@
         },
         {
           "onCreate": {
-            "id": "timestampNow",
-            "kind": "generator",
-            "params": {
-              "precision": 3
-            }
+            "id": "uuidv4",
+            "kind": "generator"
           },
-          "onUpdate": {
+          "ref": {
+            "entry": "User",
+            "field": "id",
+            "namespace": "public"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "entry": "Website",
+            "field": "id",
+            "namespace": "public"
+          }
+        },
+        {
+          "onCreate": {
             "id": "timestampNow",
             "kind": "generator",
             "params": {
@@ -437,8 +681,8 @@
             }
           },
           "ref": {
-            "entry": "User",
-            "field": "updatedAt",
+            "entry": "Website",
+            "field": "timeAdded",
             "namespace": "public"
           }
         }

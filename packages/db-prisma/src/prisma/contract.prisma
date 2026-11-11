@@ -1,21 +1,66 @@
 // use prisma-8
 
+// model User {
+//   id        Int                @id @default(autoincrement())
+//   email     String             @unique
+//   username  String?
+//   name      String?
+//   pages     Page[]
+//   createdAt DateTime           @default(now()) @onCreate(now())
+//   updatedAt temporal.UpdatedAt
+// }
+
+// model Page {
+//   id        Int                @id @default(autoincrement())
+//   title     String
+//   url       String?
+//   author    User               @relation(fields: [authorId], references: [id])
+//   authorId  Int
+//   createdAt DateTime           @default(now()) @onCreate(now())
+//   updatedAt temporal.UpdatedAt
+// }
+
 model User {
-  id        Int                @id @default(autoincrement())
-  email     String             @unique
-  username  String?
-  name      String?
-  pages     Page[]
-  createdAt DateTime           @default(now()) @onCreate(now())
-  updatedAt temporal.UpdatedAt
+  id           String     @id     @onCreate(uuid())
+  username     String     @unique
+  password     String
+  websites     Website[]
+  createdAt    DateTime   @onCreate(now())
 }
 
-model Page {
-  id        Int                @id @default(autoincrement())
-  title     String
-  url       String?
-  author    User               @relation(fields: [authorId], references: [id])
-  authorId  Int
-  createdAt DateTime           @default(now()) @onCreate(now())
-  updatedAt temporal.UpdatedAt
+model Website {
+  id          String          @id       @onCreate(uuid())
+  url         String
+  timeAdded   DateTime        @onCreate(now())
+  ticks       WebsiteTicks[]
+  user_id     String
+  user        User            @relation(fields: [user_id], references: [id])
+}
+
+
+model Region {
+  id      Int     @id
+  name    String
+  ticks   WebsiteTicks[]
+}
+
+
+// will store the timeseries data 
+model WebsiteTicks {
+  id                  Int        @id   @default(autoincrement())
+  response_time_ms    Int
+  status              status
+  createdAt           DateTime   @default(now())
+  region_id           Int
+  website_id          String
+  region              Region     @relation(fields: [region_id],references: [id])
+  website             Website    @relation(fields: [website_id],references: [id])
+
+}
+
+enum  status {
+  // Block keys and attributes
+  Up
+  Down
+  Unknown
 }

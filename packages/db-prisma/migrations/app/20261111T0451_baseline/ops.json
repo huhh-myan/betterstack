@@ -1,0 +1,563 @@
+[
+  {
+    "id": "schema.public",
+    "label": "Create schema \"public\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"public\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"public\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "table.Region",
+    "label": "Create table \"Region\"",
+    "summary": "Creates table \"Region\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Region"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Region\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Region\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"Region\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Region\"",
+        "sql": "CREATE TABLE \"public\".\"Region\" (\n  \"id\" int4 NOT NULL,\n  \"name\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Region\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"Region\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"Region\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "table.User",
+    "label": "Create table \"User\"",
+    "summary": "Creates table \"User\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"User\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"User\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"User\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"User\"",
+        "sql": "CREATE TABLE \"public\".\"User\" (\n  \"createdAt\" timestamptz(3) NOT NULL,\n  \"id\" text NOT NULL,\n  \"password\" text NOT NULL,\n  \"username\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"User\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"User\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"User\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "table.Website",
+    "label": "Create table \"Website\"",
+    "summary": "Creates table \"Website\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Website"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Website\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Website\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"Website\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Website\"",
+        "sql": "CREATE TABLE \"public\".\"Website\" (\n  \"id\" text NOT NULL,\n  \"timeAdded\" timestamptz(3) NOT NULL,\n  \"url\" text NOT NULL,\n  \"user_id\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Website\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"Website\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"Website\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "table.WebsiteTicks",
+    "label": "Create table \"WebsiteTicks\"",
+    "summary": "Creates table \"WebsiteTicks\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "WebsiteTicks"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"WebsiteTicks\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"WebsiteTicks\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"WebsiteTicks\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"WebsiteTicks\"",
+        "sql": "CREATE TABLE \"public\".\"WebsiteTicks\" (\n  \"createdAt\" timestamptz(3) DEFAULT (now()) NOT NULL,\n  \"id\" int4 NOT NULL,\n  \"region_id\" int4 NOT NULL,\n  \"response_time_ms\" int4 NOT NULL,\n  \"status\" text NOT NULL,\n  \"website_id\" text NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"WebsiteTicks_status_check_92990d30\" CHECK (\"status\" IN ('Up', 'Down', 'Unknown'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"WebsiteTicks\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"WebsiteTicks\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"WebsiteTicks\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "unique.User.User_username_key",
+    "label": "Add unique constraint on \"User\" (username)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "User_username_key",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"User_username_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "User_username_key",
+          "public",
+          "\"public\".\"User\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "constraint \"User_username_key\" on \"User\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"User_username_key\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ADD CONSTRAINT \"User_username_key\" UNIQUE (\"username\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify unique constraint \"User_username_key\" exists on (username)",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb)) AS \"result\"",
+        "params": [
+          "User_username_key",
+          "public",
+          "\"public\".\"User\"",
+          "u",
+          "[\"username\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.Website.Website_user_id_idx_6c952402",
+    "label": "Create index \"Website_user_id_idx_6c952402\" on \"Website\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "Website_user_id_idx_6c952402",
+        "table": "Website"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"Website_user_id_idx_6c952402\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Website_user_id_idx_6c952402\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"Website_user_id_idx_6c952402\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"Website_user_id_idx_6c952402\"",
+        "sql": "CREATE INDEX \"Website_user_id_idx_6c952402\" ON \"public\".\"Website\" (\"user_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"Website_user_id_idx_6c952402\" exists on \"Website\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"Website_user_id_idx_6c952402\"",
+          "i",
+          "I",
+          "\"public\".\"Website\"",
+          "btree",
+          "[\"user_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.WebsiteTicks.WebsiteTicks_region_id_idx_22635963",
+    "label": "Create index \"WebsiteTicks_region_id_idx_22635963\" on \"WebsiteTicks\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "WebsiteTicks_region_id_idx_22635963",
+        "table": "WebsiteTicks"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"WebsiteTicks_region_id_idx_22635963\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"WebsiteTicks_region_id_idx_22635963\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"WebsiteTicks_region_id_idx_22635963\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"WebsiteTicks_region_id_idx_22635963\"",
+        "sql": "CREATE INDEX \"WebsiteTicks_region_id_idx_22635963\" ON \"public\".\"WebsiteTicks\" (\"region_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"WebsiteTicks_region_id_idx_22635963\" exists on \"WebsiteTicks\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"WebsiteTicks_region_id_idx_22635963\"",
+          "i",
+          "I",
+          "\"public\".\"WebsiteTicks\"",
+          "btree",
+          "[\"region_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.WebsiteTicks.WebsiteTicks_website_id_idx_cb828943",
+    "label": "Create index \"WebsiteTicks_website_id_idx_cb828943\" on \"WebsiteTicks\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "WebsiteTicks_website_id_idx_cb828943",
+        "table": "WebsiteTicks"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"WebsiteTicks_website_id_idx_cb828943\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"WebsiteTicks_website_id_idx_cb828943\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"WebsiteTicks_website_id_idx_cb828943\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"WebsiteTicks_website_id_idx_cb828943\"",
+        "sql": "CREATE INDEX \"WebsiteTicks_website_id_idx_cb828943\" ON \"public\".\"WebsiteTicks\" (\"website_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"WebsiteTicks_website_id_idx_cb828943\" exists on \"WebsiteTicks\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"WebsiteTicks_website_id_idx_cb828943\"",
+          "i",
+          "I",
+          "\"public\".\"WebsiteTicks\"",
+          "btree",
+          "[\"website_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.Website.Website_user_id_fkey",
+    "label": "Add foreign key \"Website_user_id_fkey\" on \"Website\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "Website_user_id_fkey",
+        "table": "Website"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"Website_user_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Website_user_id_fkey",
+          "public",
+          "\"public\".\"Website\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"Website_user_id_fkey\" on \"Website\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"Website_user_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"Website\"\nADD CONSTRAINT \"Website_user_id_fkey\"\nFOREIGN KEY (\"user_id\")\nREFERENCES \"public\".\"User\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"Website_user_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "Website_user_id_fkey",
+          "public",
+          "\"public\".\"Website\"",
+          "f",
+          "[\"user_id\"]",
+          "\"public\".\"User\"",
+          "[\"id\"]",
+          "a",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.WebsiteTicks.WebsiteTicks_region_id_fkey",
+    "label": "Add foreign key \"WebsiteTicks_region_id_fkey\" on \"WebsiteTicks\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "WebsiteTicks_region_id_fkey",
+        "table": "WebsiteTicks"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"WebsiteTicks_region_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "WebsiteTicks_region_id_fkey",
+          "public",
+          "\"public\".\"WebsiteTicks\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"WebsiteTicks_region_id_fkey\" on \"WebsiteTicks\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"WebsiteTicks_region_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"WebsiteTicks\"\nADD CONSTRAINT \"WebsiteTicks_region_id_fkey\"\nFOREIGN KEY (\"region_id\")\nREFERENCES \"public\".\"Region\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"WebsiteTicks_region_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "WebsiteTicks_region_id_fkey",
+          "public",
+          "\"public\".\"WebsiteTicks\"",
+          "f",
+          "[\"region_id\"]",
+          "\"public\".\"Region\"",
+          "[\"id\"]",
+          "a",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.WebsiteTicks.WebsiteTicks_website_id_fkey",
+    "label": "Add foreign key \"WebsiteTicks_website_id_fkey\" on \"WebsiteTicks\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "WebsiteTicks_website_id_fkey",
+        "table": "WebsiteTicks"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"WebsiteTicks_website_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "WebsiteTicks_website_id_fkey",
+          "public",
+          "\"public\".\"WebsiteTicks\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"WebsiteTicks_website_id_fkey\" on \"WebsiteTicks\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"WebsiteTicks_website_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"WebsiteTicks\"\nADD CONSTRAINT \"WebsiteTicks_website_id_fkey\"\nFOREIGN KEY (\"website_id\")\nREFERENCES \"public\".\"Website\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"WebsiteTicks_website_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "WebsiteTicks_website_id_fkey",
+          "public",
+          "\"public\".\"WebsiteTicks\"",
+          "f",
+          "[\"website_id\"]",
+          "\"public\".\"Website\"",
+          "[\"id\"]",
+          "a",
+          "a"
+        ]
+      }
+    ]
+  }
+]
