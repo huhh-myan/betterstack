@@ -6,7 +6,7 @@
   //   "target": "ESNext",
     "module": "Preserve",
   //   "moduleDetection": "force", --- ALREADY IN @repo/typescript-config/base.json
-    "types": ["bun"],
+    "types": ["bun", "./express.d.ts"],
 
   //   // Bundler mode
     "moduleResolution": "bundler",
