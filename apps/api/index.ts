@@ -87,7 +87,7 @@ app.post('/signin', async (req, res)=>{
 
 })
 
-app.get('/user/:id', jsonMiddleware , (req, res)=>{
+app.get('/user', jsonMiddleware , (req, res)=>{
     return res.json({
         user_id: req.user_id
     })
@@ -100,12 +100,13 @@ app.get('/user/:id', jsonMiddleware , (req, res)=>{
 app.use(jsonMiddleware);
 //Website
 app.post('/user/website/create',async (req, res)=>{
-    const { url, user_id } = req.body;
+    const { url } = req.body;
+    const user_id = req.user_id;
     // user_id will come from the middle ware not req.body
     try {
         const website = await db.orm.public.Website.create({ 
             url: url,
-            user_id
+            user_id: user_id,
         })
 
         return res.json({
@@ -126,8 +127,12 @@ app.get('/user/website/:id',async (req, res)=>{
     // what if it should have multiple search options like name url and other
 
     try {
+
+        //fucking this works even if user_id is blank just middleware saves this code
+        //fucking raw sql better than this shit and check
         const website = await db.orm.public.Website.first({
-            id: id
+            user_id: req.user_id,
+            id
         })
 
         //add status code to positive response also 
@@ -158,8 +163,30 @@ app.get('/region/list', async (req,res)=>{
     }
 })
 
-app.post('/region/create', (req, res)=>{
+app.post('/region/create', async (req, res)=>{
+    const  regionName  = req.body.name;
 
+    const id =  Math.random()*100000 + Math.random()*Math.random();
+    if(!regionName){
+        return;
+    }
+    try{
+
+        const region = await db.orm.public.Region.create({
+            id: Math.floor(id),
+            name: regionName
+        })
+
+        return res.json({
+            message: `${region.name} created!`
+        })
+    }catch(error){
+        
+        return res.status(400).json({
+            message: "error creating region",
+            error
+        })
+    }
 })
 
 // app.post('/website  ')

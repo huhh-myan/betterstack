@@ -10,6 +10,13 @@ import type { SqlMiddleware } from '@prisma/orm-postgres/family-runtime';
 
 export const contract = contractFromJson<Contract>(contractJson);
 
+
+//db without querry logging middleware
+// export db = postgres({
+//   contract,
+//   url: process.env['DATABASE_URL']
+// });
+
 export const db = postgres({
   contract,
   url: process.env['DATABASE_URL']!,
@@ -17,7 +24,7 @@ export const db = postgres({
 });
 
 // Query Logging middleware
-// but can use db.plan
+// but can use db.plan?
 const statementsSql = Symbol("query-logger.sql");
 function queryLogger(): SqlMiddleware { 
     return {

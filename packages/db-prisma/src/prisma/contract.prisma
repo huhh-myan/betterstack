@@ -38,8 +38,12 @@ model Website {
 }
 
 
+
+//but the table of region wont have website ticks array right?
+//this is just prisma
+//need to make region name unique ig
 model Region {
-  id      Int     @id
+  id      Int     @id @default(now())
   name    String
   ticks   WebsiteTicks[]
 }
