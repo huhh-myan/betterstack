@@ -1,0 +1,156 @@
+[
+  {
+    "id": "setDefault.Region.id",
+    "label": "Set default on \"Region\".\"id\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "id",
+        "table": "Region"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"id\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "Region",
+          "id"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"id\" on \"Region\""
+        }
+      },
+      {
+        "description": "ensure column \"id\" owns a sequence or no relation is named \"public\".\"Region_id_seq\" (rename that relation, or write this migration with migration new)",
+        "sql": "SELECT ((pg_get_serial_sequence($1, $2)::regclass) IS NOT NULL OR (to_regclass($3)) IS NULL) AS \"result\"",
+        "params": [
+          "\"public\".\"Region\"",
+          "id",
+          "\"public\".\"Region_id_seq\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create sequence \"Region_id_seq\" owned by \"id\" unless the column owns one",
+        "sql": "DO $prisma$ BEGIN IF pg_get_serial_sequence('\"public\".\"Region\"', 'id')::regclass IS NULL THEN CREATE SEQUENCE \"public\".\"Region_id_seq\" AS integer; ALTER SEQUENCE \"public\".\"Region_id_seq\" OWNED BY \"public\".\"Region\".\"id\"; END IF; END $prisma$"
+      },
+      {
+        "description": "change the sequence column \"id\" owns to integer",
+        "sql": "DO $prisma$ BEGIN EXECUTE format('ALTER SEQUENCE %s AS integer', pg_get_serial_sequence('\"public\".\"Region\"', 'id')::regclass); END $prisma$"
+      },
+      {
+        "description": "set default on \"id\" to the sequence it owns",
+        "sql": "DO $prisma$ BEGIN EXECUTE format('ALTER TABLE %s ALTER COLUMN %I SET DEFAULT nextval(%L::regclass)', '\"public\".\"Region\"', 'id', pg_get_serial_sequence('\"public\".\"Region\"', 'id')::regclass::text); END $prisma$"
+      },
+      {
+        "description": "start the sequence column \"id\" owns past the largest \"id\"",
+        "sql": "SELECT setval(pg_get_serial_sequence('\"public\".\"Region\"', 'id')::regclass, GREATEST(COALESCE(MAX(\"id\"), 0), 0) + 1, false) FROM \"public\".\"Region\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"id\" takes its default from an attached sequence",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attrdef\" AS \"d\" INNER JOIN \"pg_attribute\" AS \"a\" ON (\"a\".\"attrelid\" = \"d\".\"adrelid\" AND \"a\".\"attnum\" = \"d\".\"adnum\") INNER JOIN \"pg_depend\" AS \"dep\" ON \"dep\".\"objid\" = \"d\".\"oid\" WHERE (\"d\".\"adrelid\" = to_regclass($1) AND \"a\".\"attname\" = $2 AND \"dep\".\"classid\" = 'pg_attrdef'::regclass AND \"dep\".\"refclassid\" = 'pg_class'::regclass AND \"dep\".\"refobjid\" = pg_get_serial_sequence($3, $4)::regclass)) AS \"result\"",
+        "params": [
+          "\"public\".\"Region\"",
+          "id",
+          "\"public\".\"Region\"",
+          "id"
+        ]
+      },
+      {
+        "description": "verify column \"id\" owns a sequence of type integer",
+        "sql": "SELECT ((pg_get_serial_sequence($1, $2)::regclass) IS NOT NULL AND EXISTS (SELECT 1 AS \"one\" FROM \"pg_sequence\" AS \"s\" WHERE (\"s\".\"seqrelid\" = pg_get_serial_sequence($1, $2)::regclass AND \"s\".\"seqtypid\" = to_regtype($3)))) AS \"result\"",
+        "params": [
+          "\"public\".\"Region\"",
+          "id",
+          "integer"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "setDefault.WebsiteTicks.id",
+    "label": "Set default on \"WebsiteTicks\".\"id\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "id",
+        "table": "WebsiteTicks"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"id\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "WebsiteTicks",
+          "id"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"id\" on \"WebsiteTicks\""
+        }
+      },
+      {
+        "description": "ensure column \"id\" owns a sequence or no relation is named \"public\".\"WebsiteTicks_id_seq\" (rename that relation, or write this migration with migration new)",
+        "sql": "SELECT ((pg_get_serial_sequence($1, $2)::regclass) IS NOT NULL OR (to_regclass($3)) IS NULL) AS \"result\"",
+        "params": [
+          "\"public\".\"WebsiteTicks\"",
+          "id",
+          "\"public\".\"WebsiteTicks_id_seq\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create sequence \"WebsiteTicks_id_seq\" owned by \"id\" unless the column owns one",
+        "sql": "DO $prisma$ BEGIN IF pg_get_serial_sequence('\"public\".\"WebsiteTicks\"', 'id')::regclass IS NULL THEN CREATE SEQUENCE \"public\".\"WebsiteTicks_id_seq\" AS integer; ALTER SEQUENCE \"public\".\"WebsiteTicks_id_seq\" OWNED BY \"public\".\"WebsiteTicks\".\"id\"; END IF; END $prisma$"
+      },
+      {
+        "description": "change the sequence column \"id\" owns to integer",
+        "sql": "DO $prisma$ BEGIN EXECUTE format('ALTER SEQUENCE %s AS integer', pg_get_serial_sequence('\"public\".\"WebsiteTicks\"', 'id')::regclass); END $prisma$"
+      },
+      {
+        "description": "set default on \"id\" to the sequence it owns",
+        "sql": "DO $prisma$ BEGIN EXECUTE format('ALTER TABLE %s ALTER COLUMN %I SET DEFAULT nextval(%L::regclass)', '\"public\".\"WebsiteTicks\"', 'id', pg_get_serial_sequence('\"public\".\"WebsiteTicks\"', 'id')::regclass::text); END $prisma$"
+      },
+      {
+        "description": "start the sequence column \"id\" owns past the largest \"id\"",
+        "sql": "SELECT setval(pg_get_serial_sequence('\"public\".\"WebsiteTicks\"', 'id')::regclass, GREATEST(COALESCE(MAX(\"id\"), 0), 0) + 1, false) FROM \"public\".\"WebsiteTicks\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"id\" takes its default from an attached sequence",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attrdef\" AS \"d\" INNER JOIN \"pg_attribute\" AS \"a\" ON (\"a\".\"attrelid\" = \"d\".\"adrelid\" AND \"a\".\"attnum\" = \"d\".\"adnum\") INNER JOIN \"pg_depend\" AS \"dep\" ON \"dep\".\"objid\" = \"d\".\"oid\" WHERE (\"d\".\"adrelid\" = to_regclass($1) AND \"a\".\"attname\" = $2 AND \"dep\".\"classid\" = 'pg_attrdef'::regclass AND \"dep\".\"refclassid\" = 'pg_class'::regclass AND \"dep\".\"refobjid\" = pg_get_serial_sequence($3, $4)::regclass)) AS \"result\"",
+        "params": [
+          "\"public\".\"WebsiteTicks\"",
+          "id",
+          "\"public\".\"WebsiteTicks\"",
+          "id"
+        ]
+      },
+      {
+        "description": "verify column \"id\" owns a sequence of type integer",
+        "sql": "SELECT ((pg_get_serial_sequence($1, $2)::regclass) IS NOT NULL AND EXISTS (SELECT 1 AS \"one\" FROM \"pg_sequence\" AS \"s\" WHERE (\"s\".\"seqrelid\" = pg_get_serial_sequence($1, $2)::regclass AND \"s\".\"seqtypid\" = to_regtype($3)))) AS \"result\"",
+        "params": [
+          "\"public\".\"WebsiteTicks\"",
+          "id",
+          "integer"
+        ]
+      }
+    ]
+  }
+]

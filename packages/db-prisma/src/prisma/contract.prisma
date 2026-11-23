@@ -43,7 +43,7 @@ model Website {
 //this is just prisma
 //need to make region name unique ig
 model Region {
-  id      Int     @id @default(now())
+  id      Int     @id @default(autoincrement())
   name    String
   ticks   WebsiteTicks[]
 }

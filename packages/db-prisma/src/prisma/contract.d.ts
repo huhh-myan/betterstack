@@ -23,7 +23,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'7dbcca3cd7bb0fcb66cf35582cd753b68b9e00212084fdfde358e47504210921'>;
+  StorageHashBase<'22f1476844b734b42756a6f09fc5b5b891f3319af7120aa47581a0abf1ea1485'>;
 export type ExecutionHash =
   ExecutionHashBase<'84ba3a20402209dcd120209490f64c08c3e1e6bc736de4315c9441eddffe46f6'>;
 export type ProfileHash =
@@ -398,6 +398,10 @@ type ContractBase = Omit<
                   readonly dataType: 'pg/int4';
                   readonly codecId: 'pg/int4@1';
                   readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: 'autoincrement()';
+                  };
                   readonly many: false;
                 };
                 readonly name: {
@@ -512,6 +516,10 @@ type ContractBase = Omit<
                   readonly dataType: 'pg/int4';
                   readonly codecId: 'pg/int4@1';
                   readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: 'autoincrement()';
+                  };
                   readonly many: false;
                 };
                 readonly region_id: {
