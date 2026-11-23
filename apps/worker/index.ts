@@ -36,7 +36,7 @@ async function fetchWebsite(url:string, websiteId: string) {
 }
 
 async function main() {
-    // while(1){
+    while(1){
         //read from the stream
         const websitesFromStream = await xReadGroup(REGION_ID, WORKER_ID);
 
@@ -100,7 +100,7 @@ async function main() {
 
         //then give acknowledgement to the the stream ig so that the next worker is not refed this shit
         // xAck(REGION_ID, '0');
-    // }
+    }
 }
 
 
