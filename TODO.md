@@ -10,6 +10,10 @@
     fails. Wrapping both in a transaction doesn't fix it: the worker's insert still lands between
     them. Cascade fixes it, because Postgres removes the website and its ticks in one statement.
     Once cascade is in, drop the tick delete from the route.
+- [ ] **`DELETE /user/website/:id` makes three DB calls.** It looks the website up to check
+  ownership, deletes its ticks, then deletes the website. With cascade in place this collapses to
+  one call: delete the website filtered by `id` and `user_id`, and use the returned row (or `null`)
+  to tell "deleted" from "not found / not yours". No separate ownership lookup or tick delete needed.
 
 ## Status codes and error responses (apps/api/index.ts)
 
@@ -30,3 +34,9 @@
   request hangs. It should answer 400.
 - [ ] **Catch-all 400s.** Most routes answer 400 for any thrown error, including database
   failures. Server faults should be 500.
+
+## Type errors
+
+- [ ] **`packages/db-prisma/src/prisma/db.ts:7` TS1484.** `SqlMigrationRunnerFailure` is a type
+  imported as a value, which `verbatimModuleSyntax` rejects. It's unused, along with
+  `createSqlTextSources`, `warn` and `before` on nearby lines: remove them, or use `import type`.
