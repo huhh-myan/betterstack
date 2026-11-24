@@ -23,6 +23,11 @@ export interface WebsiteTick {
   website_id: string;
 }
 
+/** A website as GET /user/website/:id returns it: with its ticks from the last 24 hours. */
+export interface WebsiteWithTicks extends Website {
+  ticks: WebsiteTick[];
+}
+
 /** A website plus the checks recorded for it. */
 export interface Monitor extends Website {
   ticks: WebsiteTick[];

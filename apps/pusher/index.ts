@@ -22,8 +22,8 @@ async function main(){
     }
 }
 
-main();
 
-// setInterval(()=>{
-//     main()
-// }, 3*60*1000)
+
+setInterval(()=>{
+    main()
+}, 3*60*1000)
