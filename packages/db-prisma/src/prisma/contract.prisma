@@ -1,31 +1,24 @@
 // use prisma-8
+// (^ required directive: the Prisma 8 CLI only reads files that start with it)
 
-// model User {
-//   id        Int                @id @default(autoincrement())
-//   email     String             @unique
-//   username  String?
-//   name      String?
-//   pages     Page[]
-//   createdAt DateTime           @default(now()) @onCreate(now())
-//   updatedAt temporal.UpdatedAt
-// }
-
-// model Page {
-//   id        Int                @id @default(autoincrement())
-//   title     String
-//   url       String?
-//   author    User               @relation(fields: [authorId], references: [id])
-//   authorId  Int
-//   createdAt DateTime           @default(now()) @onCreate(now())
-//   updatedAt temporal.UpdatedAt
-// }
+// Data contract for bstack. See ../../README.md for why each change was made.
 
 model User {
-  id           String     @id     @onCreate(uuid())
-  username     String     @unique
-  password     String
-  websites     Website[]
-  createdAt    DateTime   @onCreate(now())
+  id              String           @id     @onCreate(uuid())
+  username        String           @unique
+  // Bun.password hash (argon2id). Old plain-text rows are re-hashed on their next sign-in.
+  password        String
+  websites        Website[]
+  admin           Admin?
+  regionRequests  RegionRequest[]
+  createdAt       DateTime         @onCreate(now())
+}
+
+// A user is an admin when they have a row here. Seeded from ADMIN_USERNAMES by the API.
+model Admin {
+  user_id    String    @id
+  user       User      @relation(fields: [user_id], references: [id])
+  createdAt  DateTime  @default(now())
 }
 
 model Website {
@@ -37,34 +30,52 @@ model Website {
   user        User            @relation(fields: [user_id], references: [id])
 }
 
-
-
-//but the table of region wont have website ticks array right?
-//this is just prisma
-//need to make region name unique ig
 model Region {
-  id      Int     @id @default(autoincrement())
-  name    String
+  id      Int             @id @default(autoincrement())
+  name    String          @unique
   ticks   WebsiteTicks[]
 }
 
+// Users ask for a new region here; an admin approves (creating the Region) or rejects it.
+model RegionRequest {
+  id          Int                  @id @default(autoincrement())
+  name        String
+  reason      String?
+  status      RegionRequestStatus  @default(Pending)
+  user_id     String
+  user        User                 @relation(fields: [user_id], references: [id])
+  createdAt   DateTime             @default(now())
+  decidedAt   DateTime?
+  decided_by  String?
+}
 
-// will store the timeseries data 
+// One row per check, per region: the time series behind every chart.
 model WebsiteTicks {
   id                  Int        @id   @default(autoincrement())
   response_time_ms    Int
   status              status
+  // HTTP status code of the response, or null when no response came back.
+  http_status         Int?
+  // Why the check was not Up (timeout, DNS failure, "HTTP 503"...).
+  error               String?
+  // When the check started (set by the worker), not when the row was inserted.
   createdAt           DateTime   @default(now())
   region_id           Int
   website_id          String
   region              Region     @relation(fields: [region_id],references: [id])
   website             Website    @relation(fields: [website_id],references: [id])
 
+  @@index([website_id, createdAt])
 }
 
-enum  status {
-  // Block keys and attributes
+enum status {
   Up
   Down
   Unknown
+}
+
+enum RegionRequestStatus {
+  Pending
+  Approved
+  Rejected
 }

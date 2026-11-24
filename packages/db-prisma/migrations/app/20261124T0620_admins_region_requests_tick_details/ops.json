@@ -1,0 +1,468 @@
+[
+  {
+    "id": "table.Admin",
+    "label": "Create table \"Admin\"",
+    "summary": "Creates table \"Admin\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Admin"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Admin\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Admin\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"Admin\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Admin\"",
+        "sql": "CREATE TABLE \"public\".\"Admin\" (\n  \"createdAt\" timestamptz(3) DEFAULT (now()) NOT NULL,\n  \"user_id\" text NOT NULL,\n  PRIMARY KEY (\"user_id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Admin\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"Admin\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"Admin\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "table.RegionRequest",
+    "label": "Create table \"RegionRequest\"",
+    "summary": "Creates table \"RegionRequest\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "RegionRequest"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"RegionRequest\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"RegionRequest\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "table \"RegionRequest\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"RegionRequest\"",
+        "sql": "CREATE TABLE \"public\".\"RegionRequest\" (\n  \"createdAt\" timestamptz(3) DEFAULT (now()) NOT NULL,\n  \"decidedAt\" timestamptz(3),\n  \"decided_by\" text,\n  \"id\" SERIAL NOT NULL,\n  \"name\" text NOT NULL,\n  \"reason\" text,\n  \"status\" text DEFAULT 'Pending' NOT NULL,\n  \"user_id\" text NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"RegionRequest_status_check_f63a2b99\" CHECK (\"status\" IN ('Pending', 'Approved', 'Rejected'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"RegionRequest\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3))) AS \"result\"",
+        "params": [
+          "\"public\".\"RegionRequest\"",
+          "r",
+          "p"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "table \"RegionRequest\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "column.public.WebsiteTicks.error",
+    "label": "Add column \"error\" to \"WebsiteTicks\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "error",
+        "table": "WebsiteTicks"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"error\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "WebsiteTicks",
+          "error"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"error\" on \"WebsiteTicks\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"error\"",
+        "sql": "ALTER TABLE \"public\".\"WebsiteTicks\" ADD COLUMN \"error\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"error\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "WebsiteTicks",
+          "error"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"error\" on \"WebsiteTicks\""
+        }
+      },
+      {
+        "description": "verify column \"error\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "WebsiteTicks",
+          "error",
+          "text"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.WebsiteTicks.http_status",
+    "label": "Add column \"http_status\" to \"WebsiteTicks\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "http_status",
+        "table": "WebsiteTicks"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"http_status\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "WebsiteTicks",
+          "http_status"
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "column \"http_status\" on \"WebsiteTicks\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"http_status\"",
+        "sql": "ALTER TABLE \"public\".\"WebsiteTicks\" ADD COLUMN \"http_status\" int4"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"http_status\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "WebsiteTicks",
+          "http_status"
+        ],
+        "expectation": {
+          "expects": "present",
+          "object": "column \"http_status\" on \"WebsiteTicks\""
+        }
+      },
+      {
+        "description": "verify column \"http_status\" has type \"integer\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "WebsiteTicks",
+          "http_status",
+          "integer"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.Region.Region_name_key",
+    "label": "Add unique constraint on \"Region\" (name)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "Region_name_key",
+        "table": "Region"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"Region_name_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Region_name_key",
+          "public",
+          "\"public\".\"Region\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "constraint \"Region_name_key\" on \"Region\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"Region_name_key\"",
+        "sql": "ALTER TABLE \"public\".\"Region\" ADD CONSTRAINT \"Region_name_key\" UNIQUE (\"name\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify unique constraint \"Region_name_key\" exists on (name)",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb)) AS \"result\"",
+        "params": [
+          "Region_name_key",
+          "public",
+          "\"public\".\"Region\"",
+          "u",
+          "[\"name\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.RegionRequest.RegionRequest_user_id_idx_6c952402",
+    "label": "Create index \"RegionRequest_user_id_idx_6c952402\" on \"RegionRequest\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "RegionRequest_user_id_idx_6c952402",
+        "table": "RegionRequest"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"RegionRequest_user_id_idx_6c952402\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"RegionRequest_user_id_idx_6c952402\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"RegionRequest_user_id_idx_6c952402\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"RegionRequest_user_id_idx_6c952402\"",
+        "sql": "CREATE INDEX \"RegionRequest_user_id_idx_6c952402\" ON \"public\".\"RegionRequest\" (\"user_id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"RegionRequest_user_id_idx_6c952402\" exists on \"RegionRequest\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"RegionRequest_user_id_idx_6c952402\"",
+          "i",
+          "I",
+          "\"public\".\"RegionRequest\"",
+          "btree",
+          "[\"user_id\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.WebsiteTicks.WebsiteTicks_website_id_createdAt_idx_e1cfdff5",
+    "label": "Create index \"WebsiteTicks_website_id_createdAt_idx_e1cfdff5\" on \"WebsiteTicks\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "WebsiteTicks_website_id_createdAt_idx_e1cfdff5",
+        "table": "WebsiteTicks"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"WebsiteTicks_website_id_createdAt_idx_e1cfdff5\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"WebsiteTicks_website_id_createdAt_idx_e1cfdff5\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "index \"WebsiteTicks_website_id_createdAt_idx_e1cfdff5\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"WebsiteTicks_website_id_createdAt_idx_e1cfdff5\"",
+        "sql": "CREATE INDEX \"WebsiteTicks_website_id_createdAt_idx_e1cfdff5\" ON \"public\".\"WebsiteTicks\" (\"website_id\", \"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"WebsiteTicks_website_id_createdAt_idx_e1cfdff5\" exists on \"WebsiteTicks\" with the planned definition",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_class\" AS \"c\" INNER JOIN \"pg_index\" AS \"i\" ON \"i\".\"indexrelid\" = \"c\".\"oid\" INNER JOIN \"pg_am\" AS \"m\" ON \"m\".\"oid\" = \"c\".\"relam\" WHERE (\"c\".\"oid\" = to_regclass($1) AND (\"c\".\"relkind\" = $2 OR \"c\".\"relkind\" = $3) AND \"i\".\"indrelid\" = to_regclass($4) AND NOT (\"i\".\"indisunique\") AND \"m\".\"amname\" = $5 AND (\"i\".\"indexprs\" IS NULL AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"i\".\"indkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"i\".\"indrelid\" AND key_attribute.attnum = key_column.attnum) = ($6)::jsonb) AND \"i\".\"indpred\" IS NULL)) AS \"result\"",
+        "params": [
+          "\"public\".\"WebsiteTicks_website_id_createdAt_idx_e1cfdff5\"",
+          "i",
+          "I",
+          "\"public\".\"WebsiteTicks\"",
+          "btree",
+          "[\"website_id\",\"createdAt\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.Admin.Admin_user_id_fkey",
+    "label": "Add foreign key \"Admin_user_id_fkey\" on \"Admin\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "Admin_user_id_fkey",
+        "table": "Admin"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"Admin_user_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Admin_user_id_fkey",
+          "public",
+          "\"public\".\"Admin\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"Admin_user_id_fkey\" on \"Admin\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"Admin_user_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"Admin\"\nADD CONSTRAINT \"Admin_user_id_fkey\"\nFOREIGN KEY (\"user_id\")\nREFERENCES \"public\".\"User\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"Admin_user_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "Admin_user_id_fkey",
+          "public",
+          "\"public\".\"Admin\"",
+          "f",
+          "[\"user_id\"]",
+          "\"public\".\"User\"",
+          "[\"id\"]",
+          "a",
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.RegionRequest.RegionRequest_user_id_fkey",
+    "label": "Add foreign key \"RegionRequest_user_id_fkey\" on \"RegionRequest\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "RegionRequest_user_id_fkey",
+        "table": "RegionRequest"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"RegionRequest_user_id_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "RegionRequest_user_id_fkey",
+          "public",
+          "\"public\".\"RegionRequest\""
+        ],
+        "expectation": {
+          "expects": "absent",
+          "object": "FK \"RegionRequest_user_id_fkey\" on \"RegionRequest\""
+        }
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"RegionRequest_user_id_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"RegionRequest\"\nADD CONSTRAINT \"RegionRequest_user_id_fkey\"\nFOREIGN KEY (\"user_id\")\nREFERENCES \"public\".\"User\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"RegionRequest_user_id_fkey\" exists with the planned columns, referenced table and actions",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3) AND \"c\".\"contype\" = $4 AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"conkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"conrelid\" AND key_attribute.attnum = key_column.attnum) = ($5)::jsonb AND \"c\".\"confrelid\" = to_regclass($6) AND (SELECT coalesce(jsonb_agg(key_attribute.attname ORDER BY key_column.position), '[]'::jsonb) FROM unnest(\"c\".\"confkey\"::int2[]) WITH ORDINALITY AS key_column(attnum, position) JOIN pg_attribute key_attribute ON key_attribute.attrelid = \"c\".\"confrelid\" AND key_attribute.attnum = key_column.attnum) = ($7)::jsonb AND \"c\".\"confdeltype\" = $8 AND \"c\".\"confupdtype\" = $9)) AS \"result\"",
+        "params": [
+          "RegionRequest_user_id_fkey",
+          "public",
+          "\"public\".\"RegionRequest\"",
+          "f",
+          "[\"user_id\"]",
+          "\"public\".\"User\"",
+          "[\"id\"]",
+          "a",
+          "a"
+        ]
+      }
+    ]
+  }
+]

@@ -23,7 +23,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'22f1476844b734b42756a6f09fc5b5b891f3319af7120aa47581a0abf1ea1485'>;
+  StorageHashBase<'782a7a9cc0418411a245b4815b1e05170bd84649dc88b52f5231c071bc566b47'>;
 export type ExecutionHash =
   ExecutionHashBase<'84ba3a20402209dcd120209490f64c08c3e1e6bc736de4315c9441eddffe46f6'>;
 export type ProfileHash =
@@ -278,6 +278,12 @@ type ParameterizedOutputTypeFunctions = PgParameterizedOutputTypes;
 type FieldTypeOverrides = {
   readonly public: {
     readonly models: {
+      readonly RegionRequest: {
+        readonly status: {
+          readonly output: 'Pending' | 'Approved' | 'Rejected';
+          readonly input: 'Pending' | 'Approved' | 'Rejected';
+        };
+      };
       readonly WebsiteTicks: {
         readonly status: {
           readonly output: 'Up' | 'Down' | 'Unknown';
@@ -305,6 +311,12 @@ export type FieldInputTypes = FieldTypesFromDomain<
 >;
 type ColumnTypeOverrides = {
   readonly public: {
+    readonly RegionRequest: {
+      readonly status: {
+        readonly output: 'Pending' | 'Approved' | 'Rejected';
+        readonly input: 'Pending' | 'Approved' | 'Rejected';
+      };
+    };
     readonly WebsiteTicks: {
       readonly status: {
         readonly output: 'Up' | 'Down' | 'Unknown';
@@ -329,19 +341,39 @@ export type StorageColumnInputTypes = ColumnTypesFromStorage<
 >;
 
 export namespace Models {
+  export type public_Admin = {
+    createdAt: FieldOutputTypes['public']['Admin']['createdAt'];
+    user_id: FieldOutputTypes['public']['Admin']['user_id'];
+    user: public_User;
+    readonly [RelationKeys]?: 'user';
+  };
   export type public_Region = {
     id: FieldOutputTypes['public']['Region']['id'];
     name: FieldOutputTypes['public']['Region']['name'];
     ticks: public_WebsiteTicks[];
     readonly [RelationKeys]?: 'ticks';
   };
+  export type public_RegionRequest = {
+    createdAt: FieldOutputTypes['public']['RegionRequest']['createdAt'];
+    decidedAt: FieldOutputTypes['public']['RegionRequest']['decidedAt'];
+    decided_by: FieldOutputTypes['public']['RegionRequest']['decided_by'];
+    id: FieldOutputTypes['public']['RegionRequest']['id'];
+    name: FieldOutputTypes['public']['RegionRequest']['name'];
+    reason: FieldOutputTypes['public']['RegionRequest']['reason'];
+    status: FieldOutputTypes['public']['RegionRequest']['status'];
+    user_id: FieldOutputTypes['public']['RegionRequest']['user_id'];
+    user: public_User;
+    readonly [RelationKeys]?: 'user';
+  };
   export type public_User = {
     createdAt: FieldOutputTypes['public']['User']['createdAt'];
     id: FieldOutputTypes['public']['User']['id'];
     password: FieldOutputTypes['public']['User']['password'];
     username: FieldOutputTypes['public']['User']['username'];
+    admin: public_Admin | null;
+    regionRequests: public_RegionRequest[];
     websites: public_Website[];
-    readonly [RelationKeys]?: 'websites';
+    readonly [RelationKeys]?: 'admin' | 'regionRequests' | 'websites';
   };
   export type public_Website = {
     id: FieldOutputTypes['public']['Website']['id'];
@@ -354,6 +386,8 @@ export namespace Models {
   };
   export type public_WebsiteTicks = {
     createdAt: FieldOutputTypes['public']['WebsiteTicks']['createdAt'];
+    error: FieldOutputTypes['public']['WebsiteTicks']['error'];
+    http_status: FieldOutputTypes['public']['WebsiteTicks']['http_status'];
     id: FieldOutputTypes['public']['WebsiteTicks']['id'];
     region_id: FieldOutputTypes['public']['WebsiteTicks']['region_id'];
     response_time_ms: FieldOutputTypes['public']['WebsiteTicks']['response_time_ms'];
@@ -367,7 +401,9 @@ export namespace Models {
 
 export declare const models: {
   public: {
+    Admin: Models.public_Admin;
     Region: Models.public_Region;
+    RegionRequest: Models.public_RegionRequest;
     User: Models.public_User;
     Website: Models.public_Website;
     WebsiteTicks: Models.public_WebsiteTicks;
@@ -392,6 +428,41 @@ type ContractBase = Omit<
         readonly kind: 'postgres-schema';
         readonly entries: {
           readonly table: {
+            readonly Admin: {
+              columns: {
+                readonly createdAt: {
+                  readonly dataType: 'pg/timestamptz';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                  readonly typeParams: { readonly precision: 3 };
+                  readonly many: false;
+                };
+                readonly user_id: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['user_id'] };
+              uniques: readonly [];
+              indexes: readonly [];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'Admin';
+                    readonly columns: readonly ['user_id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'User';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
             readonly Region: {
               columns: {
                 readonly id: {
@@ -412,9 +483,96 @@ type ContractBase = Omit<
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
+              uniques: readonly [{ readonly columns: readonly ['name'] }];
               indexes: readonly [];
               foreignKeys: readonly [];
+            };
+            readonly RegionRequest: {
+              columns: {
+                readonly createdAt: {
+                  readonly dataType: 'pg/timestamptz';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                  readonly typeParams: { readonly precision: 3 };
+                  readonly many: false;
+                };
+                readonly decidedAt: {
+                  readonly dataType: 'pg/timestamptz';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly nullable: true;
+                  readonly typeParams: { readonly precision: 3 };
+                  readonly many: false;
+                };
+                readonly decided_by: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                  readonly many: false;
+                };
+                readonly id: {
+                  readonly dataType: 'pg/int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: 'autoincrement()';
+                  };
+                  readonly many: false;
+                };
+                readonly name: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+                readonly reason: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                  readonly many: false;
+                };
+                readonly status: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/text@1', 'Pending'>;
+                  };
+                  readonly many: false;
+                };
+                readonly user_id: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [
+                {
+                  readonly name: 'RegionRequest_user_id_idx_6c952402';
+                  readonly prefix: 'RegionRequest_user_id_idx';
+                  readonly columns: readonly ['user_id'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'RegionRequest';
+                    readonly columns: readonly ['user_id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'User';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
             };
             readonly User: {
               columns: {
@@ -512,6 +670,18 @@ type ContractBase = Omit<
                   readonly typeParams: { readonly precision: 3 };
                   readonly many: false;
                 };
+                readonly error: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                  readonly many: false;
+                };
+                readonly http_status: {
+                  readonly dataType: 'pg/int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: true;
+                  readonly many: false;
+                };
                 readonly id: {
                   readonly dataType: 'pg/int4';
                   readonly codecId: 'pg/int4@1';
@@ -557,6 +727,12 @@ type ContractBase = Omit<
                   readonly unique: false;
                 },
                 {
+                  readonly name: 'WebsiteTicks_website_id_createdAt_idx_e1cfdff5';
+                  readonly prefix: 'WebsiteTicks_website_id_createdAt_idx';
+                  readonly columns: readonly ['website_id', 'createdAt'];
+                  readonly unique: false;
+                },
+                {
                   readonly name: 'WebsiteTicks_website_id_idx_cb828943';
                   readonly prefix: 'WebsiteTicks_website_id_idx';
                   readonly columns: readonly ['website_id'];
@@ -592,6 +768,10 @@ type ContractBase = Omit<
             };
           };
           readonly valueSet: {
+            readonly RegionRequestStatus: {
+              readonly kind: 'valueSet';
+              readonly values: readonly ['Pending', 'Approved', 'Rejected'];
+            };
             readonly status: {
               readonly kind: 'valueSet';
               readonly values: readonly ['Up', 'Down', 'Unknown'];
@@ -607,7 +787,12 @@ type ContractBase = Omit<
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
   readonly roots: {
+    readonly Admin: { readonly namespace: 'public' & NamespaceId; readonly model: 'Admin' };
     readonly Region: { readonly namespace: 'public' & NamespaceId; readonly model: 'Region' };
+    readonly RegionRequest: {
+      readonly namespace: 'public' & NamespaceId;
+      readonly model: 'RegionRequest';
+    };
     readonly User: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
     readonly Website: { readonly namespace: 'public' & NamespaceId; readonly model: 'Website' };
     readonly WebsiteTicks: {
@@ -619,6 +804,41 @@ type ContractBase = Omit<
     readonly namespaces: {
       readonly public: {
         readonly models: {
+          readonly Admin: {
+            readonly fields: {
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly typeParams: { readonly precision: 3 };
+                };
+              };
+              readonly user_id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: {
+              readonly user: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['user_id'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'Admin';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly createdAt: { readonly column: 'createdAt' };
+                readonly user_id: { readonly column: 'user_id' };
+              };
+            };
+          };
           readonly Region: {
             readonly fields: {
               readonly id: {
@@ -652,6 +872,75 @@ type ContractBase = Omit<
               };
             };
           };
+          readonly RegionRequest: {
+            readonly fields: {
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly typeParams: { readonly precision: 3 };
+                };
+              };
+              readonly decidedAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly typeParams: { readonly precision: 3 };
+                };
+              };
+              readonly decided_by: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly name: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly reason: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly status: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly user_id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: {
+              readonly user: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['user_id'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'RegionRequest';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly createdAt: { readonly column: 'createdAt' };
+                readonly decidedAt: { readonly column: 'decidedAt' };
+                readonly decided_by: { readonly column: 'decided_by' };
+                readonly id: { readonly column: 'id' };
+                readonly name: { readonly column: 'name' };
+                readonly reason: { readonly column: 'reason' };
+                readonly status: { readonly column: 'status' };
+                readonly user_id: { readonly column: 'user_id' };
+              };
+            };
+          };
           readonly User: {
             readonly fields: {
               readonly createdAt: {
@@ -676,6 +965,29 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
+              readonly admin: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Admin';
+                };
+                readonly cardinality: '1:1';
+                readonly nullable: true;
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['user_id'];
+                };
+              };
+              readonly regionRequests: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'RegionRequest';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['user_id'];
+                };
+              };
               readonly websites: {
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;
@@ -765,6 +1077,14 @@ type ContractBase = Omit<
                   readonly typeParams: { readonly precision: 3 };
                 };
               };
+              readonly error: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly http_status: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
               readonly id: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
@@ -817,6 +1137,8 @@ type ContractBase = Omit<
               readonly namespaceId: 'public';
               readonly fields: {
                 readonly createdAt: { readonly column: 'createdAt' };
+                readonly error: { readonly column: 'error' };
+                readonly http_status: { readonly column: 'http_status' };
                 readonly id: { readonly column: 'id' };
                 readonly region_id: { readonly column: 'region_id' };
                 readonly response_time_ms: { readonly column: 'response_time_ms' };
@@ -827,6 +1149,14 @@ type ContractBase = Omit<
           };
         };
         readonly enum: {
+          readonly RegionRequestStatus: {
+            readonly codecId: 'pg/text@1';
+            readonly members: readonly [
+              { readonly name: 'Pending'; readonly value: 'Pending' },
+              { readonly name: 'Approved'; readonly value: 'Approved' },
+              { readonly name: 'Rejected'; readonly value: 'Rejected' },
+            ];
+          };
           readonly status: {
             readonly codecId: 'pg/text@1';
             readonly members: readonly [
@@ -837,6 +1167,11 @@ type ContractBase = Omit<
           };
         };
         readonly enumMemberTypes?: {
+          readonly RegionRequestStatus: readonly [
+            { readonly name: 'Pending'; readonly value: 'Pending' },
+            { readonly name: 'Approved'; readonly value: 'Approved' },
+            { readonly name: 'Rejected'; readonly value: 'Rejected' },
+          ];
           readonly status: readonly [
             { readonly name: 'Up'; readonly value: 'Up' },
             { readonly name: 'Down'; readonly value: 'Down' },
