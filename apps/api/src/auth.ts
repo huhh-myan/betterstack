@@ -4,6 +4,18 @@ import * as jose from "jose";
 import { config } from "./config";
 import { forbidden, unauthorized } from "./errors";
 
+// Declaration merging: adds `user_id` to Express's Request type. It lives in
+// the module that sets it, so anything importing this file (routes, tests)
+// gets the type, without a separate .d.ts listed in tsconfig "types".
+declare global {
+  namespace Express {
+    interface Request {
+      /** Set by requireAuth from the token's `sub` claim. */
+      user_id?: string;
+    }
+  }
+}
+
 const ALG = "HS256";
 
 export function signToken(userId: string) {

@@ -1,6 +1,13 @@
 {
   "name": "tests",
   "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@repo/db-prisma": "*"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
