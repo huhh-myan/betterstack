@@ -5,6 +5,11 @@
   `onDelete: Cascade` to the `website` relation on `WebsiteTicks` in
   `packages/db-prisma/src/prisma/contract.prisma`, re-emit the contract, and migrate. Until then,
   `DELETE /user/website/:id` must delete the website's ticks first.
+  - **Race in the two-step delete.** The route deletes the ticks, then the website. If the worker
+    inserts a tick between those two statements, the website delete hits the foreign key and
+    fails. Wrapping both in a transaction doesn't fix it: the worker's insert still lands between
+    them. Cascade fixes it, because Postgres removes the website and its ticks in one statement.
+    Once cascade is in, drop the tick delete from the route.
 
 ## Status codes and error responses (apps/api/index.ts)
 
