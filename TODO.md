@@ -40,3 +40,15 @@
 - [ ] **`packages/db-prisma/src/prisma/db.ts:7` TS1484.** `SqlMigrationRunnerFailure` is a type
   imported as a value, which `verbatimModuleSyntax` rejects. It's unused, along with
   `createSqlTextSources`, `warn` and `before` on nearby lines: remove them, or use `import type`.
+
+## Checker pipeline
+
+- [ ] **Consumer groups are created by hand.** Each region's worker reads `bstack:website` as a
+  consumer group named after the region id, and the group has to exist before the pusher queues
+  anything (`XGROUP CREATE bstack:website <region-id> $ MKSTREAM`; `$` skips messages added
+  before the group existed). Options:
+  - Create the group when a region is created (`POST /region/create` calls `xGroupCreate` after the insert).
+  - Or have each worker create its own group on startup, ignoring the `BUSYGROUP` error if it
+    already exists. This is the usual pattern: the worker is the one that needs the group, and it
+    also covers regions created before this change.
+  - Until then: document the `XGROUP CREATE` step in RUN.md as a manual step before starting.
