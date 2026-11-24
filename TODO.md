@@ -97,11 +97,12 @@
       the second `xAck` in the same batch then fails with `ClientClosedError` and the worker
       crashes on any batch of 2+ messages (`COUNT` is 5). Create the duplicate once, before the
       loop, and close it only on shutdown.
+      - Shutdown: handle `SIGINT`/`SIGTERM`; `destroy()` the blocking client (`close()` waits for
+        pending commands, and a `BLOCK 0` read may never finish), `close()` the main client.
     - [ ] **Attach an `error` listener to the duplicate.** `duplicate()` copies the options, not
       the event listeners. Without `.on('error', …)`, a Redis error on that connection is an
       unhandled `error` event and crashes the process.
-    - [ ] **Move `xAck` back to `redisClient`.** (Still on the duplicate: `xAck` now takes the
-      worker's client as a parameter.) The duplicate is the connection that blocks.
+    - [x] **Move `xAck` back to `redisClient`.** Done. The duplicate is the connection that blocks.
       Putting `xAck` on it brings back the queue-behind-the-blocked-read problem the duplicate
       was meant to fix. Only the blocking read belongs on the duplicate.
     - [ ] **Every importer opens both connections.** The clients are created at module load, so
