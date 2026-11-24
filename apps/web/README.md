@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/create-next-app).
+# web: bstack frontend
 
-## Getting Started
+Next.js 16 (App Router) + Tailwind CSS v4 + shadcn/ui (`base-nova` style, Base UI primitives) frontend for the uptime monitor in `apps/api`.
 
-First, run the development server:
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun run dev                  # http://localhost:3001
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The web app runs on **3001** because the API (`apps/api`) uses 3000. Copy `.env.example` to `.env.local` if you need to change anything.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Demo mode (no backend)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load Inter, a custom Google Font.
+PowerShell:
 
-## Learn More
+```powershell
+$env:NEXT_PUBLIC_MOCK = "1"; bun run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Everything (accounts, websites, regions, checks) is mock data kept in this browser's localStorage. Any username/password works and new accounts get five sample monitors.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Pages
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Route | What it does | API calls |
+|---|---|---|
+| `/` | Landing page | none |
+| `/signin`, `/signup` | Auth forms. Sign-up signs you in straight after. | `POST /signup`, `POST /signin` |
+| `/dashboard` | Monitors list: status, 24 h uptime strip, uptime %, avg response, add-monitor dialog | `GET /user/website/:id` per known id, `GET /region/list` |
+| `/dashboard/monitors/[id]` | Monitor detail: status, uptime/avg/p95, 24 h uptime bar, response-time chart per region, region table, recent checks | `GET /user/website/:id`, `GET /region/list` |
+| `/dashboard/regions` | List and create regions | `GET /region/list`, `POST /region/create` |
 
-## Deploy on Vercel
+## How it talks to the API
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **No CORS needed.** The browser calls `/api/*` on this app; `next.config.js` rewrites it to `API_URL` (default `http://localhost:3000`).
+- **Auth:** the JWT from `/signin` is stored in localStorage (`bstack:session`) and sent as the raw `Authorization` header (no `Bearer`), as `apps/api/middleware.ts` expects. A 400 `"Authorization Error!"` from the API signs you out and sends you to `/signin`. `/dashboard/*` is guarded in the browser (`app/dashboard/layout.tsx`).
+- All data access goes through **`lib/data.ts`**. Pages never call `fetch` directly.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## What's simulated, and how to replace it
+
+The API is missing a few endpoints, so `lib/data.ts` fills the gaps. The dashboard shows a banner saying so.
+
+| Gap in the API | What the frontend does now | Swap it for |
+|---|---|---|
+| No "list my websites" endpoint | Remembers ids of websites created in this browser (`bstack:websites:<userId>`) and fetches each one. Websites created elsewhere (curl, tests) can be added by id from the "Add monitor" dialog. | `GET /user/websites` → replace the id loop in `listMonitors` |
+| No endpoint for ticks | `simulateTicks()` in `lib/mock.ts` makes 24 h of deterministic checks every 3 min per region | Return ticks from the API (e.g. `GET /user/website/:id/ticks?since=…`) and drop `simulateTicks` in `toMonitor` |
+| No delete endpoint | "Remove from dashboard" only forgets the id locally | `DELETE /user/website/:id` → call it in `removeMonitor` |
+
+Once ticks come from the API, every chart, uptime bar and stat works unchanged: they're computed in `lib/stats.ts` from a `WebsiteTick[]` shaped like the Prisma model.
+
+## Layout
+
+```
+app/
+  page.tsx                    landing
+  (auth)/signin, signup       auth pages (shared components/auth-form.tsx)
+  dashboard/                  client-guarded app
+    page.tsx                  monitors list
+    monitors/[id]/page.tsx    monitor detail
+    regions/page.tsx          regions
+components/
+  ui/                         shadcn components (generated: `bunx shadcn add <name>`)
+  uptime-bar.tsx, response-chart.tsx, status.tsx, add-monitor-dialog.tsx, …
+lib/
+  api.ts      typed fetch client for apps/api
+  data.ts     the data layer the UI uses (real / hybrid / mock)
+  mock.ts     tick simulator + full mock backend
+  stats.ts    uptime %, avg/p95, buckets, chart series
+  session.ts  token + known-website storage
+```
+
+## Theme
+
+Dark by default with a light/system toggle (`next-themes`). Status colors are `--up`, `--down`, `--unknown` in `app/globals.css`, and status is always shown with an icon or label too, never by color alone. Region lines use `--chart-1..3`, a palette checked for color-blind readability.
