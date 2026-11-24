@@ -1292,6 +1292,23 @@ Several regions let you tell "the site is down" (most regions agree) from "one p
 ## 6. Open questions
 
 ### To do
+- [ ] (P106, added 2026-11-24) **To learn: RAM, swap, and the OOM killer.** Came up deploying to a 1.6 GB Vultr server, where `next build` had to share memory with Postgres, Redis and four Bun apps. My first reaction: "what the fuck is a swap file".
+  - **The problem it solves:** every running program keeps its working data in RAM, and RAM is small (1.6 GB here). When programs together ask for more than exists, the OS has to do *something*. Without swap the only option is to kill a process.
+  - **How it works:**
+    - *RAM* is fast working memory. *Swap* is an area on disk (here a normal file, `/swapfile`, 2.3 GB) that the OS uses as overflow.
+    - When RAM runs short, Linux picks memory **pages** (4 KB chunks) that haven't been used for a while and writes them into swap ("swapping out"), freeing that RAM for whatever is active.
+    - If a program touches that data again, Linux reads it back into RAM ("swapping in"), maybe moving something else out. Programs never notice, except that it's slower.
+    - Analogy that made it click: RAM is the desk, swap is a drawer under it. A full desk means papers go in the drawer instead of the bin.
+  - **The OOM killer:** when RAM *and* swap are both full, the kernel's **Out-Of-Memory killer** picks a process (it scores them; usually the biggest memory user) and kills it to save the system. Symptom: the process just dies, the terminal shows `Killed`, exit code 137 (128 + signal 9, `SIGKILL`; see P103), and `dmesg` or `journalctl -k` shows `Out of memory: Killed process …`. On a shared server the victim may be Postgres, not the thing that caused the spike.
+  - **Seen on the server:** Vultr's Ubuntu image had already made a 2.3 GB `/swapfile` on first boot. `next build` pushed ~120 MB into swap and finished; without swap it might have been killed.
+  - **Gotchas / would have missed:**
+    - Disk is ~100–1000x slower than RAM. Swap is a safety net for short peaks (a build), not extra RAM. A server that swaps all the time ("thrashing": constantly moving pages in and out) crawls; the fix is more RAM or fewer processes.
+    - Check with `free -h` (the `Swap:` line) and `swapon --show`; watch it live with `vmstat 1` (`si`/`so` columns = swap in/out per second).
+    - Docker containers have no memory limit by default, so one container can eat the whole server's RAM. `docker run --memory=512m` caps it (then the OOM killer acts *inside* that container only).
+    - `swappiness` (`/proc/sys/vm/swappiness`, default 60) sets how eagerly Linux swaps; databases often prefer it lower.
+    - The swap file is `chmod 600` because swapped-out memory can contain secrets (passwords, tokens) in plain form.
+  - **Connects to:** P103 (exit code 137 = killed by signal 9, the uncatchable `SIGKILL`, the same signal `docker stop` sends after 10 s); P41 (memory leaks / too many connections in dev also end here eventually).
+  - **Read:** `man 8 swapon`, `man 5 proc` (`/proc/meminfo`), the Linux kernel docs "Out Of Memory handling"; Ubuntu's "SwapFaq" community page.
 - [ ] (P105, added 2026-11-24) **To learn: SSH and public/private key pairs.** Came up setting up the Vultr server: I ran `ssh-keygen -t ed25519`, added the `.pub` line to Vultr, and Claude will log in with the other file.
   - **The problem it solves:** logging into a remote server with a password means the secret travels to the server every time, can be guessed (bots try millions of passwords against every public IP), and the server has to store something password-like. With a key pair, **the secret never leaves my machine** and the server only stores something that's useless to an attacker.
   - **How a key pair works:**
