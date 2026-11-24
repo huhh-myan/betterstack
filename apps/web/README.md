@@ -7,7 +7,7 @@ Next.js 16 (App Router) + Tailwind CSS v4 + shadcn/ui (`base-nova` style, Base U
 - [Page map](#page-map)
 - [Interaction paths](#interaction-paths)
 - [How it talks to the API](#how-it-talks-to-the-api)
-- [What's simulated, and how to replace it](#whats-simulated-and-how-to-replace-it)
+- [Demo mode vs real data](#demo-mode-vs-real-data)
 - [Code layout](#code-layout)
 
 ## Run it
@@ -26,11 +26,19 @@ PowerShell:
 $env:NEXT_PUBLIC_MOCK = "1"; bun run dev
 ```
 
-Everything (accounts, websites, regions, checks) is mock data kept in this browser's localStorage. Any username/password works and new accounts get five sample monitors, one of them in an ongoing outage.
+Everything (accounts, websites, regions, checks) is mock data kept in this browser's localStorage. Any username/password works and new accounts get five sample monitors, one of them in an ongoing outage. Usernames starting with `admin` are admins.
+
+With the real stack (API + pusher + worker, see `RUN.md`) everything is real: your websites, their checks from every region, deletes, and region requests.
 
 ## Screenshots
 
-All taken in demo mode at 1280×800 (phone: 390×844).
+Taken at 1280×800 (phone: 390×844). Most are in demo mode, which has 3 days of simulated history; the **real stack** shots show a fresh account a few minutes after adding two monitors.
+
+### Real stack: dashboard and a monitor
+
+| Dashboard (one site up, one down) | Monitor detail |
+|---|---|
+| ![Real dashboard](docs/screenshots/11-real-dashboard.png) | ![Real monitor detail](docs/screenshots/12-real-detail.png) |
 
 ### Landing page `/`
 
@@ -57,25 +65,31 @@ Summary cards, then every monitor with its status, a 24-hour strip (one bar per 
 
 ### Add monitor dialog
 
-Opened from **Add monitor**. `mysite.io` is normalised to `https://mysite.io` before it's sent, because the worker needs a full URL. With the real API, a link under the field switches to "add an existing website by id".
+Opened from **Add monitor**. The preview shows `mysite.io` becoming `https://mysite.io`; the API applies the same rule and rejects anything that isn't an http(s) URL.
 
 ![Add monitor dialog](docs/screenshots/04-add-monitor.png)
 
 ### Monitor detail `/dashboard/monitors/[id]`
 
-Status, uptime, average and p95 response time; a 24-hour uptime bar (hover a bar for its counts); response time per region (hover for a crosshair tooltip); what each region saw; and the latest 15 checks.
+Status, uptime, average and p95 response time; a 24-hour uptime bar (hover a bar for its counts); response time per region (hover for a crosshair tooltip); what each region saw; and the latest 15 checks. Failed checks show why: `HTTP 503`, `timed out after 10000 ms`, `connection refused`…
 
 ![Monitor detail](docs/screenshots/05-monitor-detail.png)
 
-The **⋯** menu: copy the website id, open the site, or remove the monitor.
+The **⋯** menu: copy the website id, open the site, or delete the monitor (with its history, after a confirm dialog).
 
 ![Monitor actions menu](docs/screenshots/06-monitor-actions.png)
 
 ### Regions `/dashboard/regions`
 
-Lists regions and creates new ones. Names are checked before sending (lowercase, digits and dashes), because the API never answers an empty name.
+Regions are shared by everyone, so only **admins** create them. Everyone else **requests** one, and an admin approves (which creates it) or rejects.
 
-![Regions](docs/screenshots/07-regions.png)
+| User: request a region, see your requests | Admin: create, approve or reject |
+|---|---|
+| ![Regions as a user](docs/screenshots/13-regions-user.png) | ![Regions as an admin](docs/screenshots/14-regions-admin.png) |
+
+Names are checked in the browser too (lowercase, digits, dashes):
+
+![Regions validation](docs/screenshots/07-regions.png)
 
 ### Light theme and phone width
 
@@ -98,7 +112,7 @@ flowchart TD
         detail["/dashboard/monitors/[id]<br/>Monitor detail"]
         regions["/dashboard/regions<br/>Regions"]
         addDlg{{"Add monitor dialog"}}
-        rmDlg{{"Remove / delete<br/>confirm dialog"}}
+        rmDlg{{"Delete confirm dialog"}}
     end
 
     landing -- "Get started / Start monitoring" --> signup
@@ -110,9 +124,9 @@ flowchart TD
 
     dash -- "click a row" --> detail
     dash -- "Add monitor" --> addDlg
-    addDlg -- "created / added" --> detail
+    addDlg -- "created" --> detail
     detail -- "← Monitors" --> dash
-    detail -- "⋯ → Remove" --> rmDlg
+    detail -- "⋯ → Delete monitor" --> rmDlg
     rmDlg -- "confirm" --> dash
     dash <-->|"top nav"| regions
 
@@ -132,35 +146,60 @@ flowchart TD
     check -- yes --> render["Render the page and fetch data"]
     toSignin --> form["Submit username + password"]
     form --> ok{"API answer"}
-    ok -- "200 + token" --> save["Save session"] --> back["Go to ?next= (or /dashboard)"] --> render
-    ok -- "409 wrong credentials" --> err["Show the API's message on the form"] --> form
+    ok -- "200 + token + isAdmin" --> save["Save session"] --> back["Go to ?next= (or /dashboard)"] --> render
+    ok -- "401 wrong username or password" --> err["Show the API's message on the form"] --> form
+    ok -- "400 missing field" --> err
     ok -- "API down (500 from the proxy)" --> down["Show: Can't reach the API"] --> form
     render --> apiCall{"Any API call"}
-    apiCall -- "400 Authorization Error!" --> clear["Clear session"] --> toSignin
+    apiCall -- "401 token invalid or expired" --> clear["Clear session"] --> toSignin
     apiCall -- ok --> show["Show data, refresh every 60 s"]
 ```
 
-### Adding a monitor
+### Adding a monitor, and where its data comes from
 
 ```mermaid
 sequenceDiagram
     actor U as You
     participant D as Add monitor dialog
-    participant L as lib/data.ts
-    participant P as Next.js /api rewrite
     participant A as apps/api
+    participant P as pusher
+    participant W as worker (per region)
 
     U->>D: type "mysite.io"
-    D->>D: normalise → https://mysite.io (preview under the field)
+    D->>D: preview https://mysite.io
     U->>D: Create monitor
-    D->>L: createMonitor(url)
-    L->>P: POST /api/user/website/create (Authorization = raw JWT)
-    P->>A: POST /user/website/create
-    A-->>L: website row
-    L->>L: remember website.id in localStorage (no list endpoint yet)
-    L-->>D: website
-    D-->>U: toast "Monitor created", open /dashboard/monitors/[id]
-    Note over U,A: In demo mode (NEXT_PUBLIC_MOCK=1) lib/data.ts answers<br/>from the in-browser mock db and nothing leaves the browser.
+    D->>A: POST /user/website/create (Bearer token)
+    A->>A: Zod: valid http(s) URL, add https://
+    A-->>D: 201 website
+    D-->>U: toast, open /dashboard/monitors/[id] ("Pending")
+    P->>W: next cycle: job for this website (via Redis)
+    W->>A: (writes a tick to Postgres)
+    U->>A: page refresh (every 60 s): GET /user/website/:id/ticks
+    A-->>U: ticks → status, uptime bar, chart
+    Note over U,W: In demo mode (NEXT_PUBLIC_MOCK=1) lib/data.ts answers from<br/>an in-browser mock db with simulated ticks, and nothing leaves the browser.
+```
+
+### Requesting and approving a region
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    actor Ad as Admin
+    participant A as apps/api
+
+    U->>A: POST /region/request {name, reason}
+    A-->>U: 201 (Pending), or 409 exists / already asked
+    Ad->>A: GET /region/requests (admins see all)
+    alt approve
+        Ad->>A: POST /region/requests/:id/approve
+        A->>A: transaction: create Region + mark Approved
+        A-->>Ad: 200 {region, request}
+        Note over Ad: start a worker with REGION_ID = new id
+    else reject
+        Ad->>A: POST /region/requests/:id/reject
+        A-->>Ad: 200 {request: Rejected}
+    end
+    U->>A: GET /region/requests (own): sees the decision
 ```
 
 ### Monitor lifecycle as the UI shows it
@@ -172,11 +211,11 @@ stateDiagram-v2
     Pending --> Down: first checks fail
     Up --> Down: latest check failed in any region
     Down --> Up: latest check succeeds in every region
-    Up --> Unknown: a region reported Unknown
+    Up --> Unknown: a region got HTTP 429
     Unknown --> Up
     Unknown --> Down
-    Up --> [*]: removed
-    Down --> [*]: removed
+    Up --> [*]: deleted
+    Down --> [*]: deleted
 ```
 
 "Current status" is the worst of each region's latest check. Uptime % counts only Up and Down checks.
@@ -186,18 +225,20 @@ stateDiagram-v2
 | Where | Control | What happens |
 |---|---|---|
 | Header (all pages) | Sun/moon icon | Theme menu: Light, Dark, System. Dark is the default. |
-| Dashboard header | Avatar | Shows username and user id; **Sign out** clears the session and goes to `/signin`. |
+| Dashboard header | Avatar | Shows username (and "admin"), user id; **Sign out** clears the session and goes to `/signin`. |
 | Dashboard | ↻ | Refetches now. Data also refreshes every 60 s. |
 | Dashboard | **Add monitor** | Opens the add dialog. |
 | Dashboard | Filter box | Filters rows by URL as you type. |
 | Dashboard | A row, or its hostname | Opens the monitor detail page. |
-| Add dialog | "Add it by id" link (real API only) | Switches to pasting the id of a website made with curl or the tests. |
 | Monitor detail | Uptime bar | Hover or focus a bar: time range, status, up/down counts. |
 | Monitor detail | Response chart | Hover: crosshair with each region's average at that time. |
-| Monitor detail | **⋯ → Copy website id** | Copies the id (handy for "add by id" in another browser). |
+| Monitor detail | Recent checks | Failed rows show the reason (`HTTP 503`, `timed out…`); hover for the full text. |
+| Monitor detail | **⋯ → Copy website id** | Copies the id (for curl or the manual tests). |
 | Monitor detail | **⋯ → Open website** | Opens the monitored URL in a new tab. |
-| Monitor detail | **⋯ → Remove / Delete** | Confirm dialog. Real API: hides it in this browser only (no delete endpoint). Demo: deletes it. |
-| Regions | **Create region** | Validates the name, then `POST /region/create`. |
+| Monitor detail | **⋯ → Delete monitor** | Confirm dialog, then `DELETE /user/website/:id` (website and its history). |
+| Regions (user) | **Send request** | Validates the name, then `POST /region/request`; it appears under "Your requests". |
+| Regions (admin) | **Create region** | `POST /region/create`; the toast says which `REGION_ID` to start a worker with. |
+| Regions (admin) | **Approve / Reject** | Decides a pending request; approving creates the region. |
 
 ### Loading, empty and error states
 
@@ -207,9 +248,10 @@ stateDiagram-v2
 | Loading data | Skeleton rows/cards |
 | No monitors | "No monitors yet" with an Add monitor button |
 | New monitor, no checks yet | Status "Pending", "Waiting for the first check", empty chart message |
-| Unknown monitor id | "Monitor not found" with a link back |
+| Unknown monitor id, or someone else's | "Monitor not found" with a link back (the API answers 404 for both) |
 | API unreachable | Red alert with the message and **Try again** |
-| Token rejected | Signed out and sent to `/signin?next=…` |
+| Token rejected (401) | Signed out and sent to `/signin?next=…` |
+| No requests yet | "No requests yet." |
 
 ## How it talks to the API
 
@@ -222,27 +264,27 @@ flowchart LR
 ```
 
 - **No CORS needed.** The browser calls `/api/*` on this app; `next.config.js` rewrites it to `API_URL` (default `http://localhost:3000`).
-- **Auth:** the JWT from `/signin` is stored in localStorage (`bstack:session`) and sent as the raw `Authorization` header (no `Bearer`), as `apps/api/middleware.ts` expects. A 400 `"Authorization Error!"` from the API signs you out and sends you to `/signin`.
+- **Auth:** the JWT from `/signin` is stored in localStorage (`bstack:session`, with `isAdmin`) and sent as `Authorization: Bearer <token>`. A **401** from any call signs you out and sends you to `/signin`.
 - All data access goes through **`lib/data.ts`**. Pages never call `fetch` directly.
 
 | Route | API calls |
 |---|---|
 | `/signin`, `/signup` | `POST /signin`, `POST /signup` (then `/signin`) |
-| `/dashboard` | `GET /region/list`, `GET /user/website/:id` for each remembered id |
-| `/dashboard/monitors/[id]` | `GET /user/website/:id`, `GET /region/list` |
-| `/dashboard/regions` | `GET /region/list`, `POST /region/create` |
+| `/dashboard` | `GET /user/websites` (with 24 h of ticks), `GET /region/list` |
+| `/dashboard/monitors/[id]` | `GET /user/website/:id`, `GET /user/website/:id/ticks`, `GET /region/list`, `DELETE /user/website/:id` |
+| `/dashboard/regions` | `GET /region/list`, `GET /region/requests`, `POST /region/request` (user), `POST /region/create` and `POST /region/requests/:id/approve\|reject` (admin) |
 
-## What's simulated, and how to replace it
+## Demo mode vs real data
 
-The API is missing a few endpoints, so `lib/data.ts` fills the gaps. The dashboard shows a banner saying so.
-
-| Gap in the API | What the frontend does now | Swap it for |
+| | Real (`bun run dev`) | Demo (`NEXT_PUBLIC_MOCK=1`) |
 |---|---|---|
-| No "list my websites" endpoint | Remembers ids of websites created in this browser (`bstack:websites:<userId>`) and fetches each one. Websites created elsewhere (curl, tests) can be added by id from the "Add monitor" dialog. | `GET /user/websites` → replace the id loop in `listMonitors` |
-| No endpoint for ticks | `simulateTicks()` in `lib/mock.ts` makes 24 h of deterministic checks every 3 min per region | Return ticks from the API (e.g. `GET /user/website/:id/ticks?since=…`) and drop `simulateTicks` in `toMonitor` |
-| No delete endpoint | "Remove from dashboard" only forgets the id locally | `DELETE /user/website/:id` → call it in `removeMonitor` |
+| Accounts | `apps/api` | Any username/password, stored in localStorage |
+| Websites | `apps/api` | localStorage; five samples per new account |
+| Checks (ticks) | Written by the worker, read from the API | `simulateTicks()` in `lib/mock.ts`: 3 days of deterministic history |
+| Admins | `ADMIN_USERNAMES` / `Admin` table | Usernames starting with `admin` |
+| Banner | none | "Demo mode" banner on every dashboard page |
 
-Once ticks come from the API, every chart, uptime bar and stat works unchanged: they're computed in `lib/stats.ts` from a `WebsiteTick[]` shaped like the Prisma model.
+Charts, uptime bars and stats are computed the same way in both modes, by `lib/stats.ts`, from a `WebsiteTick[]` shaped like the Prisma model.
 
 ## Code layout
 
@@ -253,16 +295,16 @@ app/
   dashboard/                  client-guarded app
     page.tsx                  monitors list
     monitors/[id]/page.tsx    monitor detail
-    regions/page.tsx          regions
+    regions/page.tsx          regions, region requests (admin and user views)
 components/
   ui/                         shadcn components (generated: `bunx shadcn add <name>`)
   uptime-bar.tsx, response-chart.tsx, status.tsx, add-monitor-dialog.tsx, …
 lib/
   api.ts      typed fetch client for apps/api
-  data.ts     the data layer the UI uses (real / hybrid / mock)
-  mock.ts     tick simulator + full mock backend
+  data.ts     the data layer the UI uses (real API or demo mock)
+  mock.ts     demo mode: mock backend + tick simulator
   stats.ts    uptime %, avg/p95, buckets, chart series
-  session.ts  token + known-website storage
+  session.ts  token storage
 docs/screenshots/             images used in this README
 ```
 

@@ -2,39 +2,23 @@
 
 Two ways to run it:
 
-- **[Demo mode](#1-demo-mode-frontend-only)**: just the frontend, with mock data in your browser. No database, Redis or API needed. Start here.
-- **[Full stack](#2-full-stack-frontend--api)**: the frontend talking to the real API (`apps/api`), which needs Postgres. Redis, the pusher and the worker are optional.
+- **[Demo mode](#1-demo-mode-frontend-only)**: just the frontend, with mock data in your browser. No database, Redis or API needed.
+- **[Full stack](#2-full-stack)**: Postgres + Redis + API + pusher + worker + frontend, with real checks of real websites.
 
 ## Prerequisites
 
-- **[Bun](https://bun.sh) 1.3.14** (the repo's package manager and runtime)
-- **Node.js 24+** (the root `package.json` asks for it)
-- **Git**
+- **[Bun](https://bun.sh) 1.3.14**, **Node.js 24+**, **Git**
 - Full stack only: **Docker** (or local installs) for **Postgres 15+** and **Redis**
 
 ## Get the code
 
-The frontend lives on the `feature/web-frontend` branch.
-
-New clone:
-
 ```bash
-git clone -b feature/web-frontend https://github.com/huhh-myan/betterstack.git
+git clone -b feature/ai-changed https://github.com/huhh-myan/betterstack.git
 cd betterstack
-```
-
-Existing clone:
-
-```bash
-git fetch origin
-git switch feature/web-frontend
-```
-
-Then install everything from the repo root:
-
-```bash
 bun install
 ```
+
+Existing clone: `git fetch origin`, then `git switch feature/ai-changed`, then `bun install`.
 
 ## 1. Demo mode (frontend only)
 
@@ -42,7 +26,7 @@ bun install
 cd apps/web
 ```
 
-Windows PowerShell:
+PowerShell:
 
 ```powershell
 $env:NEXT_PUBLIC_MOCK = "1"; bun run dev
@@ -54,69 +38,110 @@ macOS / Linux:
 NEXT_PUBLIC_MOCK=1 bun run dev
 ```
 
-Open **http://localhost:3001** and sign up with **any** username and password. The new account comes with five sample monitors, one of them currently down.
+Open **http://localhost:3001** and sign up with any username and password. New accounts get five sample monitors (one is down). A username starting with **`admin`** (e.g. `admin1`) is an admin in demo mode, so you can try both region views. Demo data lives in localStorage; clear site data for `localhost:3001` to reset it.
 
-Things to try: open a monitor, hover the uptime bar and the chart, add a monitor (`mysite.io` works), create a region, switch light/dark from the sun/moon icon.
+## 2. Full stack
 
-Demo data is stored in your browser's localStorage. To reset it, clear site data for `localhost:3001` in the browser's dev tools.
+### 2.1 Start Postgres and Redis
 
-Stop the server with **Ctrl+C**.
+Existing containers:
 
-## 2. Full stack (frontend + API)
+```bash
+docker start rocky_road wizardly_rubin
+```
 
-### Start Postgres (and Redis, if you want the checker pipeline)
-
-With Docker, for example:
+Or new ones:
 
 ```bash
 docker run -d --name bstack-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=bstack -p 5432:5432 postgres:18
 docker run -d --name bstack-redis -p 6379:6379 redis
 ```
 
-### Point the API at the database
+### 2.2 Environment files
 
-Each backend app loads `.env` from the folder you run it in. Create `apps/api/.env` (see `packages/db-prisma/.env.example`):
+Each app loads `.env` from its own folder. All four need the same `DATABASE_URL`:
 
+| File | Contents |
+|---|---|
+| `packages/db-prisma/.env` | `DATABASE_URL=...` (used by the Prisma CLI) |
+| `apps/api/.env` | copy `apps/api/.env.example`: `DATABASE_URL`, **`JWT_SECRET`** (32+ random chars), `ADMIN_USERNAMES=admin` |
+| `apps/pusher/.env` | `DATABASE_URL=...` |
+| `apps/worker/.env` | `DATABASE_URL=...` |
+
+Generate a JWT secret:
+
+```bash
+bun -e "console.log(crypto.randomUUID().replaceAll('-','') + crypto.randomUUID().replaceAll('-',''))"
 ```
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/bstack"
+
+### 2.3 Apply the database migrations
+
+```bash
+cd packages/db-prisma
+bunx prisma db migrate
+bunx prisma migration status
 ```
 
-Make sure the database schema is applied (see `packages/db-prisma/prisma-8.md` and `README_details.md`).
+`status` should say **Up to date**.
 
-### Start the API (port 3000)
+### 2.4 Start the four processes (four terminals)
+
+API (port 3000):
 
 ```bash
 cd apps/api
-bun index.ts
+bun run dev
 ```
 
-### Start the frontend (port 3001)
-
-In a second terminal:
+Frontend (port 3001):
 
 ```bash
 cd apps/web
 bun run dev
 ```
 
-Open **http://localhost:3001**, create an account and add monitors. The browser sends every request to `/api/*` on port 3001 and Next.js forwards it to the API on port 3000, so the API needs no CORS setup. To use an API somewhere else, set `API_URL` (copy `apps/web/.env.example` to `apps/web/.env.local`).
+Pusher (queues every website every 3 minutes; set `PUSH_INTERVAL_MS=30000` for faster results while testing):
 
-**Still simulated with the real API:** the uptime and response-time numbers. The API doesn't have an endpoint for check results (ticks) yet, so the frontend generates them and shows a banner saying so. Accounts, websites and regions are real. Details: `apps/web/README.md`.
+```bash
+cd apps/pusher
+bun index.ts
+```
 
-### Optional: the checker pipeline (pusher + worker)
+Worker. `REGION_ID` must be the id of an existing region, and `WORKER_ID` a name that stays the same across restarts. PowerShell:
 
-These write real ticks to the database (the frontend doesn't read them yet). Per `README_details.md`:
+```powershell
+cd apps/worker
+$env:REGION_ID = "1"; $env:WORKER_ID = "w1"; bun index.ts
+```
 
-1. Create each region's consumer group once, in `redis-cli`:
-   ```
-   XGROUP CREATE bstack:website <region-id> $ MKSTREAM
-   ```
-2. Give `apps/pusher` and `apps/worker` the same `.env` as the API.
-3. Run each from its own folder:
-   ```bash
-   cd apps/pusher && bun index.ts   # queues every website once, then Ctrl+C
-   cd apps/worker && bun index.ts   # checks a batch, then Ctrl+C
-   ```
+macOS / Linux:
+
+```bash
+cd apps/worker
+REGION_ID=1 WORKER_ID=w1 bun index.ts
+```
+
+### 2.5 Use it
+
+1. Open **http://localhost:3001** and sign up.
+2. Add a monitor. Its first check appears after the next pusher cycle (up to 3 minutes).
+3. **Admin:** sign up with a username listed in `ADMIN_USERNAMES` (default `admin`). Existing users in that list become admins when the API starts. Admins create regions and approve requests on the **Regions** page; everyone else can request a region there.
+4. **New region:** after creating it, start a worker for it: `REGION_ID=<its id>`, plus a `WORKER_ID` of your choice.
+
+## 3. Tests
+
+```bash
+docker exec -it rocky_road psql -U postgres -c "CREATE DATABASE bstack_test;"
+```
+
+Then migrate `bstack_test` (see `apps/tests/README.md`), copy `apps/tests/.env.example` to `apps/tests/.env`, and run:
+
+```bash
+cd apps/tests
+bun test
+```
+
+Type checks: `bunx tsc --noEmit -p .` in `apps/api`, `apps/worker`, `apps/pusher`, `apps/tests`, `packages/redis` and `packages/db-prisma`, and `bun run check-types` in `apps/web`.
 
 ## Ports
 
@@ -131,17 +156,13 @@ These write real ticks to the database (the frontend doesn't read them yet). Per
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Sign-in says **"Can't reach the API. Is apps/api running?"** | The API isn't running on :3000 (and demo mode is off) | Start `apps/api`, or run the frontend in demo mode |
-| Port 3001 is already in use, or Next.js says a dev server is already running | Another dev server for `apps/web` is still running (Next.js allows one per app folder) | Stop it (Ctrl+C in its terminal, or end the process using port 3001) |
-| Sent to the sign-in page while using the dashboard | The API rejected the token. Tokens expire after 2 hours. | Sign in again |
-| Demo mode isn't on even though you set the variable | `NEXT_PUBLIC_*` is read when the server starts | Set it in the same terminal *before* `bun run dev`, then restart |
-| The API crashes on start with a database error | `DATABASE_URL` missing or Postgres not running | Check `apps/api/.env` and that the Postgres container is up |
-
-## Checks
-
-From `apps/web`:
-
-```bash
-bun run check-types   # TypeScript
-bun run build         # production build
-```
+| Sign-in says **"Can't reach the API. Is apps/api running?"** | The API isn't running on :3000 | Start `apps/api`, or use demo mode |
+| API exits: **`JWT_SECRET is not set`** / **must be at least 32 characters** | `apps/api/.env` incomplete | Add a generated secret (2.2) |
+| Any app exits: **`DATABASE_URL is not set`** | No `.env` in the folder you ran it from | Run from the app's folder, or add its `.env` |
+| **`Can't connect to Redis`** | Redis container stopped | `docker start wizardly_rubin` |
+| Worker exits: **`Region N doesn't exist`** | Wrong `REGION_ID` | Use an id from the Regions page, or create the region |
+| Monitors stay "Waiting…" | Pusher or worker not running, or no worker for any region | Start both; check the worker log for `Up`/`Down` lines |
+| Port 3001 already in use / "a dev server is already running" | Another `apps/web` dev server | Stop it (Ctrl+C, or end the process on port 3001) |
+| Sent back to sign in | Token expired (2 h) or the API's `JWT_SECRET` changed | Sign in again |
+| Demo mode isn't on | `NEXT_PUBLIC_*` is read when the server starts | Set it in the same terminal, before `bun run dev` |
+| Can't create regions | You're not an admin | Use a username from `ADMIN_USERNAMES`, then restart the API (or sign up with it) |
