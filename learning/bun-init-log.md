@@ -1292,6 +1292,17 @@ Several regions let you tell "the site is down" (most regions agree) from "one p
 ## 6. Open questions
 
 ### To do
+- [ ] (P103, added 2026-11-24) **To learn: signals (`SIGINT`, `SIGTERM`, `SIGKILL`) and graceful shutdown.** Came up deciding when to close the worker's Redis connections (P102).
+  - **The problem:** a long-running process (API, worker, pusher) gets stopped from outside: Ctrl+C, a deploy, `docker stop`, a crash of the machine. If it just dies, in-flight work is lost: a batch of websites read but not acked, a tick half-written, connections dropped without a goodbye. Signals are how the OS tells a process "stop now, please", so it gets a chance to finish cleanly first.
+  - **What a signal is:** a small numbered message the OS delivers to a process. The process either handles it (runs your code) or gets the default action (usually: exit at once).
+  - **The three to know:**
+    - `SIGINT` ("interrupt", 2): sent when you press **Ctrl+C** in the terminal. Default: exit.
+    - `SIGTERM` ("terminate", 15): the polite "please shut down" that tools send: `kill <pid>`, `docker stop`, Kubernetes, systemd, most hosting platforms on deploy. Default: exit.
+    - `SIGKILL` (9): "die now". **Cannot be caught or handled**; the process gets no chance to clean up. `docker stop` sends `SIGTERM`, waits 10 seconds, then sends `SIGKILL`. So shutdown code has a time limit.
+  - **How you handle one in Node/Bun:** `process.on('SIGINT', handler)` / `process.on('SIGTERM', handler)`. Once you add a handler, the default "exit" no longer happens, so the handler must end with `process.exit(...)` itself, or the process keeps running.
+  - **Graceful shutdown for the worker:** stop taking new work (break out of the read loop), let the current batch finish and be acked, `destroy()` the blocking Redis client, `close()` the main Redis client and the DB, then exit. For the API: stop accepting new requests (`server.close()`), let in-flight ones finish, close the DB.
+  - **Windows caveat (I'm on Windows):** Windows has no real signals. Node/Bun emulate `SIGINT` for Ctrl+C, and `SIGBREAK` for Ctrl+Break. A `SIGTERM` handler does not fire when a process is killed from Task Manager or `taskkill`, so test `SIGTERM` handling on Linux or in Docker, which is where it matters in production anyway.
+  - **Read:** Node docs, "Signal events" (`https://nodejs.org/api/process.html#signal-events`); `man 7 signal` for the full list.
 - [ ] (P102, added 2026-11-24) **To learn: one connection, blocking commands, and `duplicate()`.** Came up while making the worker's `xReadGroup` use `BLOCK: 0`. Cover:
   - **The problem:** a Redis connection answers commands strictly in the order they were sent. A blocking command (`XREADGROUP … BLOCK 0`, `BLPOP`, `BRPOP`) holds back every command queued behind it on that connection until it returns. `packages/redis` shares one client (one connection) across `xAdd`, `xReadGroup` and `xAck`.
   - **What I asked: "what if the pusher calls `xAdd` while the worker is blocked?"** Nothing bad. The pusher is a separate process with its own client and connection. Its `xAdd` reaches Redis right away, Redis appends to the stream and wakes the blocked reader. Blocking only affects commands on the *same* connection.

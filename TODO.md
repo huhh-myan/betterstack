@@ -128,3 +128,18 @@
   nothing else until the blocking command returns, and a subscribed connection is in subscriber
   mode and refuses normal commands altogether. Check this when adding a results stream, a
   pub/sub channel for live dashboard updates, or more workers.
+
+## Graceful shutdown
+
+- [ ] **No process handles `SIGINT`/`SIGTERM`** (see P103 in the learning log). On Ctrl+C or a
+  deploy, the worker dies mid-batch (messages read but not acked get redelivered, sites checked
+  twice), and connections are dropped without closing.
+  - `apps/worker`: on `SIGINT`/`SIGTERM`, stop the read loop, let the current batch finish and
+    ack, `destroy()` the blocking Redis client, `close()` the main Redis client and the DB, then
+    `process.exit(0)`.
+  - `apps/pusher`: `clearInterval` the timer, let a push in progress finish, close Redis and the DB.
+  - `apps/api`: `server.close()` (keep the value `app.listen` returns), let in-flight requests
+    finish, close the DB.
+  - Keep it under ~10 seconds: `docker stop` sends `SIGKILL` after that, which can't be handled.
+  - Test `SIGTERM` handling on Linux or in Docker; on Windows it doesn't fire for Task Manager
+    or `taskkill`.
