@@ -2,6 +2,7 @@
 // unit-tested on its own.
 
 import axios from "axios";
+import dns from "node:dns";
 
 export type TickStatus = "Up" | "Down" | "Unknown";
 
@@ -48,12 +49,46 @@ export function describeNetworkError(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/**
+ * DNS lookup that prefers IPv4 and falls back to IPv6.
+ *
+ * Why: many sites (google.com, github.com…) publish IPv6 (AAAA) and IPv4 (A)
+ * addresses. On a network without working IPv6, connecting to the IPv6 one
+ * hangs until the timeout, and Bun doesn't fall back to IPv4 by itself
+ * (browsers and curl do, using "Happy Eyeballs"). That made healthy sites
+ * show "timed out" = false Down. Bun ignores axios's `family: 4` and
+ * dns.setDefaultResultOrder("ipv4first"), but does use a custom `lookup`.
+ * IPv6-only sites still work: they have no IPv4 address, so IPv6 is used.
+ */
+// Callback style on purpose: axios under Bun mishandles the promise-returning
+// form (requests hang, and DNS errors escape as uncaught exceptions).
+type LookupCallback = (err: NodeJS.ErrnoException | null, address: any, family?: number) => void;
+
+function lookupPreferIPv4(onPick: (address: string) => void) {
+  return (hostname: string, options: { all?: boolean } | undefined, callback: LookupCallback) => {
+    dns.lookup(hostname, { all: true }, (err, addresses) => {
+      if (err) return callback(err, undefined);
+      const pick = addresses.find((a) => a.family === 4) ?? addresses[0];
+      if (!pick) {
+        return callback(Object.assign(new Error(`no address for ${hostname}`), { code: "ENOTFOUND" }), undefined);
+      }
+      onPick(pick.address);
+      // Callers may ask for a list (options.all) or for a single address.
+      if (options?.all) return callback(null, [pick]);
+      callback(null, pick.address, pick.family);
+    });
+  };
+}
+
 /** Requests the URL once and classifies the outcome. Never throws. */
 export async function checkWebsite(url: string): Promise<CheckResult> {
   const startedAt = new Date();
   const t0 = performance.now();
+  // The address actually connected to, so a failure can say where it went wrong.
+  let address: string | null = null;
   try {
     const res = await axios.get(url, {
+      lookup: lookupPreferIPv4((a) => (address = a)) as any,
       timeout: REQUEST_TIMEOUT_MS,
       // Accept every status: a 503 is a result to record, not an exception.
       validateStatus: () => true,
@@ -66,7 +101,8 @@ export async function checkWebsite(url: string): Promise<CheckResult> {
     return { ...classify({ httpStatus: res.status }), responseTimeMs, httpStatus: res.status, startedAt };
   } catch (err) {
     const responseTimeMs = Math.round(performance.now() - t0);
-    const reason = describeNetworkError(err);
+    // e.g. "timed out after 10000 ms (connecting to 142.250.1.2)"
+    const reason = describeNetworkError(err) + (address ? ` (connecting to ${address})` : "");
     return { ...classify({ httpStatus: null, error: reason }), responseTimeMs, httpStatus: null, startedAt };
   }
 }

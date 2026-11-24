@@ -90,6 +90,7 @@ Line numbers refer to `main` (`apps/worker/index.ts`).
 - `check.ts`: one pure `classify()` (unit-tested in `apps/tests/worker.test.ts`) and `checkWebsite()` that **never throws**: timeout, `validateStatus: () => true` (a 503 is a result, not an exception), readable error reasons, a User-Agent, and a 5 MB body cap.
 - `index.ts`: env-driven `REGION_ID`/`WORKER_ID` (fails fast if missing or if the region doesn't exist); `ensureGroup`; recovers its own pending jobs on start (id `0`); `XAUTOCLAIM` every minute for jobs stuck more than 5 minutes; `BLOCK 5000` reads; **insert, then ack**; a failed insert isn't acked (retried later) unless the website was deleted (then acked, since it can never succeed); per-job failures logged; Ctrl+C finishes the current batch, then exits.
 - Ticks now store `http_status`, `error`, and **the time the check started** as `createdAt`.
+- **Found later while testing: IPv6 false Downs.** `google.com` and `www.google.com` timed out on every check while `example.com` was Up. The network returns IPv6 (AAAA) addresses but can't route IPv6, and Bun connects to them without falling back to IPv4 (browsers and curl fall back automatically, "Happy Eyeballs"). `check.ts` now passes axios a DNS `lookup` that **prefers IPv4** and uses IPv6 only for IPv6-only sites. Under Bun, axios ignores `family: 4` and `dns.setDefaultResultOrder`, and only the **callback** form of `lookup` works (the async form hangs). Failure reasons now name the address, e.g. `timed out after 10000 ms (connecting to 142.250.182.78)`.
 
 ## What you should add next
 
