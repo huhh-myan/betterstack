@@ -85,3 +85,27 @@
   - **Mitigation without a second connection:** use a finite block, e.g. `BLOCK: 5000`, and loop.
     Other commands then wait at most 5 seconds instead of forever. It reduces the problem but
     doesn't solve it.
+  - **Progress on `feature/web-frontend`:** `packages/redis/index.ts` now makes `redisClientWorker`
+    with `redisClient.duplicate()` and uses it for `xRead`, `xReadGroup` and `xAck`. Left to do:
+    - [ ] **`connect()` the duplicate.** `duplicate()` only builds a new client object; it isn't
+      connected. Every command on it fails with `ClientClosedError: The client is closed`
+      until `await redisClientWorker.connect()` runs.
+    - [ ] **Attach an `error` listener to the duplicate.** `duplicate()` copies the options, not
+      the event listeners. Without `.on('error', …)`, a Redis error on that connection is an
+      unhandled `error` event and crashes the process.
+    - [ ] **Move `xAck` back to `redisClient`.** The duplicate is the connection that blocks.
+      Putting `xAck` on it brings back the queue-behind-the-blocked-read problem the duplicate
+      was meant to fix. Only the blocking read belongs on the duplicate.
+    - [ ] **Every importer opens both connections.** The clients are created at module load, so
+      the pusher (which only does `xAdd`) and anything else that imports the package also opens
+      the reader connection. Create the reader lazily on first `xReadGroup`, or split the
+      package into a producer part and a consumer part.
+- [ ] **Run several workers per region (later).** Spawn more workers with Bun's `Worker`
+  (worker threads) or as separate processes, each with its own consumer name (`WORKER_ID`) in
+  the same group so Redis splits the batch between them.
+  - Relation to the blocking read: each worker thread loads `packages/redis` separately, so each
+    gets its own clients and connections. Threads don't block each other's Redis commands.
+    Inside one worker, though, the blocking read and other Redis commands still share a
+    connection unless the read has its own (the duplicate). More workers don't replace that fix.
+  - Each worker needs a distinct `WORKER_ID`; two workers with the same consumer name share one
+    pending list and can't tell whose messages are whose.
