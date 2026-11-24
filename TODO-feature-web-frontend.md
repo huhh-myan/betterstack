@@ -18,8 +18,10 @@ Status-code cleanup lives in `TODO.md` on `main`.
   answers 400. Remove that unused line.
 - [ ] **`(tick: any)` / `(t: any)` annotations.** They switch off the ORM's typing, which would
   have flagged the two bugs above. Let the types be inferred.
-- [ ] **`GET /user/website/:id` response key.** The frontend reads `{ website }`, the route
-  returns `{ websiteWithTicks }`. Rename one side.
+- [x] `GET /user/website/:id` response key: the frontend now reads `{ websiteWithTicks }`.
+- [ ] **`DELETE /user/website/:id` filters ticks on `user_id`, which `WebsiteTicks` doesn't have.**
+  A tick only knows its `website_id`; ownership lives on `Website`. Look up the website by `id`
+  and `user_id` first, stop with 404 if it's `null`, then delete its ticks by `website_id`.
 - [x] `DELETE /user/website/:id` deletes ticks before the website (race tracked in `TODO.md` on `main`).
 - [ ] **`DELETE /user/website/:id` model name.** It uses `db.orm.public.websiteTicks`; the model is
   `WebsiteTicks`. The lowercase name is undefined, so every delete throws.
@@ -32,11 +34,15 @@ Status-code cleanup lives in `TODO.md` on `main`.
 
 ## Frontend (apps/web)
 
-- [ ] `lib/data.ts`: list monitors from `GET /user/websites` and drop the localStorage id list
-  (`lib/session.ts` `rememberWebsiteId` / `getKnownWebsiteIds` / `forgetWebsiteId`).
-- [ ] `lib/data.ts`: make `removeMonitor` call `DELETE /user/website/:id`.
-- [ ] `lib/data.ts`: use real ticks from the API instead of `simulateTicks`. Set
-  `simulatedTicks: false` and remove the "Check results are simulated" notice.
-- [ ] Dashboard list needs ticks per website: either one ticks request per website, or have
-  `GET /user/websites` include the last 24h of ticks.
-- [ ] `lib/api.ts`: add `listWebsites` and `deleteWebsite`, and update `getWebsite`'s response type.
+- [x] `lib/data.ts`: list monitors from `GET /user/websites`; localStorage id list removed from
+  `lib/session.ts`, along with the "add an existing website by id" option in the add dialog.
+- [x] `lib/data.ts`: `removeMonitor` calls `DELETE /user/website/:id`; the delete dialog says it
+  really deletes, and a failed delete shows an error toast instead of navigating away.
+- [x] `lib/data.ts`: real ticks from the API; `simulateTicks` is only used in mock mode, and the
+  "Check results are simulated" banner only shows in mock mode.
+- [x] `lib/api.ts`: `listWebsites`, `deleteWebsite`, and `getWebsite` typed as `{ websiteWithTicks }`.
+- [ ] **Dashboard list makes one request per website (N+1).** Fine for a handful of monitors.
+  Later: have `GET /user/websites` include the last 24h of ticks and drop the per-website calls.
+- [ ] **`bun run lint` in apps/web fails to start:** `Cannot find package 'eslint' imported from
+  packages/eslint-config/next.js`. The eslint-config package doesn't declare `eslint` itself.
+- [ ] Test the frontend against the real API once the backend items above are fixed.
