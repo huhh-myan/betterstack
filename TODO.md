@@ -206,3 +206,22 @@
   with sudo and set `PermitRootLogin no`). Keys only.
 - [ ] **One key per person/machine.** If a friend ever needs access, add *their* public key to
   `authorized_keys`; never share `claude-ssh`. Remove a key by deleting its line.
+
+## Live site (bstack.daszeichen.xyz, deployed 2026-11-24; see hosting.md on feature/web-frontend)
+
+- [ ] **Hash passwords before friends sign up for real.** Passwords are stored in plain text on
+  the live server and `/signup` returns them. `Bun.password.hash` / `Bun.password.verify`.
+- [ ] **Move the JWT secret to env and rotate it.** It is hardcoded in `apps/api/index.ts` and
+  `middleware.ts` and public on GitHub, so anyone can forge a token for any live user.
+- [ ] **Stop sending error objects to clients.** The live API returns full stack traces with
+  server paths (`/opt/bstack/...`, library versions), e.g. for a bad token. Send a fixed
+  message, log the error on the server.
+- [ ] **Bind the API to 127.0.0.1.** Express listens on all interfaces (`*:3000`); only ufw keeps
+  it private. Pass a host to `app.listen` so it's private even if the firewall changes.
+- [ ] **Database backups.** Live data exists only in the `bstack-pg` Docker volume. A nightly
+  `pg_dump` (cron/systemd timer) copied off the server, and a tested restore.
+- [ ] **Deploy from git, not from my working tree.** The first deploy copied uncommitted local
+  files with `tar`. Commit + push, then `git pull` on the server (or a small deploy script), so
+  the live code always matches a commit.
+- [ ] **Redis password.** Live Redis has none (safe only because it listens on 127.0.0.1); needs
+  `REDIS_URL` support in `packages/redis` first.
