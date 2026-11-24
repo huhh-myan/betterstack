@@ -1,107 +1,143 @@
-import { xAck, xReadGroup } from "@repo/redis-stream/index"
-import axios from "axios";
+// Worker: takes website jobs from the Redis stream for one region, checks each
+// site, stores the result as a WebsiteTicks row, then acks the job.
+// See README.md for the full lifecycle and why the order matters.
+
 import { db } from "@repo/db-prisma/db";
+import {
+  close,
+  ensureGroup,
+  type StreamMessage,
+  xAck,
+  xAutoClaim,
+  xReadGroup,
+} from "@repo/redis-stream/index";
+import { checkWebsite } from "./check";
 
-//region of worker
-// const REGION_ID = process.env.REGION_ID!;
-const REGION_ID = "1";
-
-//need worker id to later distribute tasks from stream to distribute task to worker according to region
-// const WORKER_ID = process.env.WORKER_ID!;
-const WORKER_ID = "1";
-
-if(!REGION_ID){
-    throw new Error('REGION not provided!')
+const REGION_ID = Number(process.env.REGION_ID);
+const WORKER_ID = process.env.WORKER_ID;
+if (!Number.isInteger(REGION_ID) || REGION_ID <= 0) {
+  throw new Error("REGION_ID must be set to the id of a row in the Region table (e.g. REGION_ID=1).");
+}
+if (!WORKER_ID) {
+  // Must be stable across restarts: it's how the worker finds the jobs it was
+  // holding when it stopped.
+  throw new Error("WORKER_ID must be set (e.g. WORKER_ID=w1). Use a different one for each worker in a region.");
 }
 
-if(!WORKER_ID){
-    throw new Error('Worker not provided!')
-}
+/** One consumer group per region: every region checks every website. */
+const GROUP = String(REGION_ID);
+const BATCH_SIZE = Number(process.env.BATCH_SIZE ?? 10);
+const BLOCK_MS = 5_000;
+/** A job unacked this long is assumed to belong to a dead worker. */
+const CLAIM_IDLE_MS = 5 * 60 * 1000;
+const CLAIM_EVERY_MS = 60 * 1000;
 
+let stopping = false;
 
-// need a redis stream function to create Consumer groups based on regions.
+async function handle({ id: streamId, message }: StreamMessage) {
+  if (!message.url || !message.id) {
+    // A malformed job will never succeed; ack it so it doesn't come back forever.
+    console.warn(`[worker] dropping malformed job ${streamId}`);
+    await xAck(GROUP, streamId);
+    return;
+  }
 
-interface ReadGroupResult {
-    id:string,
-    message:{ 
-        url:string, 
-        id: string 
+  // 1. Check the site. checkWebsite never throws: failures are results.
+  const result = await checkWebsite(message.url);
+
+  // 2. Store the result. Separate from the check, so a DB error can't turn a
+  //    healthy site into a false "Down".
+  try {
+    await db.orm.public.WebsiteTicks.create({
+      response_time_ms: result.responseTimeMs,
+      status: result.status,
+      http_status: result.httpStatus,
+      error: result.error,
+      createdAt: result.startedAt,
+      region_id: REGION_ID,
+      website_id: message.id,
+    });
+  } catch (err) {
+    // The website may have been deleted after the job was queued: then the
+    // job can never succeed, so ack it. Otherwise leave it unacked so it is
+    // retried (pending list / XAUTOCLAIM).
+    const stillExists = await db.orm.public.Website.where({ id: message.id }).select("id").first().catch(() => null);
+    if (!stillExists) {
+      await xAck(GROUP, streamId);
+      return;
     }
+    throw err;
+  }
+
+  // 3. Ack only now. If the worker dies before this line, the job stays
+  //    pending and is checked again: at-least-once delivery.
+  await xAck(GROUP, streamId);
+  console.log(
+    `[worker ${WORKER_ID}] ${result.status.padEnd(7)} ${message.url} ${result.responseTimeMs} ms${result.error ? ` (${result.error})` : ""}`,
+  );
 }
 
-//separate the fetch functions
-//separate the db upload to another queue ig,
-async function fetchWebsite(url:string, websiteId: string) {
-    
+async function processBatch(messages: StreamMessage[]) {
+  if (!messages.length) return;
+  // allSettled: one bad job must not stop the others in the batch.
+  const results = await Promise.allSettled(messages.map(handle));
+  results.forEach((r, i) => {
+    if (r.status === "rejected") {
+      const reason = r.reason instanceof Error ? r.reason.message : String(r.reason);
+      console.error(`[worker ${WORKER_ID}] job ${messages[i]!.id} failed, will retry: ${reason}`);
+    }
+  });
 }
 
 async function main() {
-    while(1){
-        //read from the stream
-        const websitesFromStream = await xReadGroup(REGION_ID, WORKER_ID);
+  const region = await db.orm.public.Region.where({ id: REGION_ID }).first();
+  if (!region) throw new Error(`Region ${REGION_ID} doesn't exist. Create it first (admin: POST /region/create).`);
 
-        if(!websitesFromStream){
-            //have to do something instead of throwing error 
-            throw new Error('Stream empty')
-        }
+  await ensureGroup(GROUP);
+  console.log(`[worker ${WORKER_ID}] region ${REGION_ID} (${region.name}), group "${GROUP}"`);
 
-        // console.log(websitesFromStream[0]?.messages);
+  // Jobs this worker received before it stopped but never acked.
+  for (;;) {
+    const pending = await xReadGroup(GROUP, WORKER_ID!, { id: "0", count: 50 });
+    if (!pending.length) break;
+    console.log(`[worker ${WORKER_ID}] recovering ${pending.length} pending job(s)`);
+    await processBatch(pending);
+  }
 
-        //can use map function instead of this 
-        for (const message of websitesFromStream[0]?.messages ){
-            console.log(message);
-
-            await xAck(REGION_ID, `${message.id}`)
-        }
-        //using map function 
-        //writing the types for promises
-        let promisesAxiosArray = await Promise.allSettled(websitesFromStream[0]?.messages.map(async ({id, message }: ReadGroupResult )=>{
-            const url = message.url;
-            const websiteId = message.id;
-
-            //cant await this will hold up the thread ig so gotta promise all
-            //the difference between promise all and not doing await, does await hold up the thread,? context switching
-            const t1 = Date.now();
-            try{
-                const response = await axios.get(url);
-                // const endTime = Date.now();
-                const response_time_ms = Date.now() - t1;
-
-                //there is a default createdAt but that is not the time at which the site
-                // was queried but rather the time when the result was entered into the db
-                await db.orm.public.WebsiteTicks.create({
-                    response_time_ms: response_time_ms,
-                    status: 'Up',
-                    region_id: 1,
-                    website_id: websiteId,
-                });
-            }catch(e){
-                // const endTime = Date.now();
-                const response_time_ms = Date.now()-t1;
-                await db.orm.public.WebsiteTicks.create({
-                    response_time_ms,
-                    status: 'Down',
-                    region_id: 1,
-                    website_id: websiteId
-                })
-            }
-
-
-            console.log(promisesAxiosArray);
-            // take message.url and hit the site
-            // put the result of the hit in db or an queue
-            // then acknowledge to the stream that the thing has been done
-        }))
-
-
-        //call the website and store in db 
-
-        //storage of website status to db routed through queue
-
-        //then give acknowledgement to the the stream ig so that the next worker is not refed this shit
-        // xAck(REGION_ID, '0');
+  let lastClaim = 0;
+  while (!stopping) {
+    try {
+      // Jobs stuck with a worker that died (unacked for CLAIM_IDLE_MS).
+      if (Date.now() - lastClaim > CLAIM_EVERY_MS) {
+        lastClaim = Date.now();
+        const claimed = await xAutoClaim(GROUP, WORKER_ID!, CLAIM_IDLE_MS, BATCH_SIZE);
+        if (claimed.length) console.log(`[worker ${WORKER_ID}] claimed ${claimed.length} stale job(s)`);
+        await processBatch(claimed);
+      }
+      // Waits up to BLOCK_MS for new jobs; an empty result is normal.
+      const messages = await xReadGroup(GROUP, WORKER_ID!, { id: ">", count: BATCH_SIZE, blockMs: BLOCK_MS });
+      await processBatch(messages);
+    } catch (err) {
+      // e.g. Redis restarted: log, wait a bit, try again instead of crashing.
+      console.error(`[worker ${WORKER_ID}] loop error:`, err instanceof Error ? err.message : err);
+      await new Promise((r) => setTimeout(r, 2_000));
     }
+  }
+  await close();
+  console.log(`[worker ${WORKER_ID}] stopped`);
+  process.exit(0);
 }
 
+function stop() {
+  if (stopping) process.exit(1); // second Ctrl+C: leave now
+  stopping = true;
+  console.log(`[worker ${WORKER_ID}] stopping after the current batch...`);
+}
+process.on("SIGINT", stop);
+process.on("SIGTERM", stop);
 
-main();
+main().catch(async (err) => {
+  console.error(`[worker ${WORKER_ID}]`, err instanceof Error ? err.message : err);
+  await close();
+  process.exit(1);
+});
