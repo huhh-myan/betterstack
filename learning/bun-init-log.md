@@ -1292,6 +1292,30 @@ Several regions let you tell "the site is down" (most regions agree) from "one p
 ## 6. Open questions
 
 ### To do
+- [ ] (P105, added 2026-11-24) **To learn: SSH and public/private key pairs.** Came up setting up the Vultr server: I ran `ssh-keygen -t ed25519`, added the `.pub` line to Vultr, and Claude will log in with the other file.
+  - **The problem it solves:** logging into a remote server with a password means the secret travels to the server every time, can be guessed (bots try millions of passwords against every public IP), and the server has to store something password-like. With a key pair, **the secret never leaves my machine** and the server only stores something that's useless to an attacker.
+  - **How a key pair works:**
+    - `ssh-keygen` makes two files that are mathematically linked: the **private key** (`claude-ssh`) and the **public key** (`claude-ssh.pub`).
+    - The **public key can only check**, the **private key can sign**. Knowing the public key doesn't let anyone work out the private one (that's the hard math problem the security rests on: elliptic curves for ed25519, factoring large numbers for RSA).
+    - So the public key is safe to hand out (paste into Vultr, GitHub, a server). The private key never leaves my machine and is never pasted anywhere.
+  - **What happens when I run `ssh root@<ip>`:**
+    1. The server proves *it* is the right server (host key; see below), and both sides agree on an encryption key for the session.
+    2. The server says "prove you own one of the public keys in `~/.ssh/authorized_keys`" and sends a challenge tied to this session.
+    3. My SSH client **signs** the challenge with the private key and sends back only the signature.
+    4. The server **checks** the signature with the stored public key. Valid → logged in. The private key itself was never sent.
+  - **Where the pieces live:**
+    - My machine: `~/.ssh/claude-ssh` (private), `~/.ssh/claude-ssh.pub` (public), `~/.ssh/known_hosts` (servers I've connected to before), optionally `~/.ssh/config` (shortcuts: `Host bstack`, `HostName <ip>`, `User root`, `IdentityFile ~/.ssh/claude-ssh`, then just `ssh bstack`).
+    - The server: `~/.ssh/authorized_keys` (one public key per line; Vultr puts my key there when the server is created).
+  - **The other direction: host keys and `known_hosts`.** The *server* also has a key pair. On the first connection SSH shows its fingerprint and asks "are you sure?". Saying yes saves it in `known_hosts`. If it ever changes, SSH refuses with "REMOTE HOST IDENTIFICATION HAS CHANGED": either the server was rebuilt (expected, e.g. a reinstalled Vultr instance on the same IP) or someone is in the middle. Don't blindly delete the line; know which it is.
+  - **The passphrase:** encrypts the private key file on disk. If the file is stolen, it's useless without the passphrase. Cost: you type it on use, unless `ssh-agent` holds the unlocked key for the session. Without a passphrase, the file alone is enough to log in.
+  - **Gotchas I hit or would have missed:**
+    - `ssh-keygen` asked "Enter file in which to save the key" and I typed `claude-ssh`: a bare name is saved in the **current folder**, which was the repo root. One `git add .` would have published the private key. Give a full path (`~/.ssh/claude-ssh`) or press Enter for the default.
+    - A private key that ever reached GitHub (even in a commit that was later deleted) is compromised. Delete it from every server's `authorized_keys` and make a new pair.
+    - Permissions: on Linux/macOS SSH refuses a private key readable by others ("UNPROTECTED PRIVATE KEY FILE"); `chmod 600` the private key, `700` the `~/.ssh` folder.
+    - The comment at the end of the `.pub` line (`your_email@example.com`) is just a label; it plays no part in the security.
+    - ed25519 is the modern default: short keys, fast, safe. RSA still works but needs 3072+ bits; DSA is deprecated and disabled in current OpenSSH.
+  - **Connects to:** P57/P58 (JWTs). Same family of ideas: HS256 (what the API uses) is one shared secret that both signs and checks, like a password. RS256/EdDSA JWTs use a key pair exactly like SSH: the auth server signs with the private key, anyone can verify with the public key. Also HTTPS: the certificate Caddy will get holds the site's public key, and the browser checks signatures made with the private key that stays on the server.
+  - **Read:** `man ssh-keygen`, `man ssh_config`; GitHub docs "Generating a new SSH key and adding it to the ssh-agent"; Cloudflare Learning "What is public key cryptography?".
 - [ ] (P104, added 2026-11-24) **To learn: one central Redis (and Postgres) with workers in many regions.** Came up while choosing hosting: the plan is one main server with Redis + Postgres, plus a small VM per region running only the worker.
   - **The problem it solves:** an uptime monitor should check each site *from several places*, so "down from India, up from Germany" can be told apart from "down everywhere". Every region needs the same list of websites at the same moment, and within one region several workers should share the work without checking a site twice. The pusher shouldn't have to know which regions or workers exist.
   - **How streams + consumer groups do it (the core idea):**

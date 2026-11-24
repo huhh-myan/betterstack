@@ -191,3 +191,18 @@
   messages. Either run a worker for region 2 or `XGROUP DESTROY` it.
 - [ ] **Later: workers send results to a stream instead of writing to Postgres.** One writer next
   to the DB inserts ticks, so regional VMs need no DB credentials and the DB stays private.
+
+## SSH and server access (see P105)
+
+- [ ] **Keep private keys out of the repo.** On 2026-11-24 `ssh-keygen` saved `claude-ssh` and
+  `claude-ssh.pub` in the repo root (moved to `~/.ssh` before anything was committed). Add
+  `*.pem`, `id_*`, `*_ed25519`, `*-ssh` and similar patterns to `.gitignore` as a safety net.
+- [ ] **Decide on a passphrase for `~/.ssh/claude-ssh`.** Without one, anyone who copies the file
+  can log into the server. With one, load it into `ssh-agent` for the session.
+- [ ] **Add a `~/.ssh/config` entry** (`Host bstack`, `HostName <ip>`, `User`, `IdentityFile
+  ~/.ssh/claude-ssh`) so `ssh bstack` works without flags.
+- [ ] **On the server: turn off password logins and root login.** In `/etc/ssh/sshd_config`:
+  `PasswordAuthentication no`, `PermitRootLogin prohibit-password` (or create a normal user
+  with sudo and set `PermitRootLogin no`). Keys only.
+- [ ] **One key per person/machine.** If a friend ever needs access, add *their* public key to
+  `authorized_keys`; never share `claude-ssh`. Remove a key by deleting its line.
