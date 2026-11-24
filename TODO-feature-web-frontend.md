@@ -13,6 +13,26 @@ Status-code cleanup lives in `TODO.md` on `main`.
 - [x] `packages/db-prisma` had no `node_modules`, so the ORM resolved to `any` and the API
   couldn't import it. Fixed with `bun install` at the root.
 
+## Checker pipeline (apps/pusher, apps/worker): needed for real ticks
+
+- [ ] **Region 1 must exist.** The worker writes every tick with `region_id: 1` (and reads as
+  consumer group `"1"`). `POST /region/create` picks a random id, so region 1 usually doesn't
+  exist and every tick insert fails on the foreign key. Either let the DB assign the id
+  (drop the random `id` so autoincrement gives the first region 1) or read the region id from env.
+- [ ] **Consumer group `1` must exist before the pusher runs.** `XGROUP CREATE bstack:website 1 $ MKSTREAM`.
+  `$` means "only messages added after now", so create the group first.
+- [ ] **Worker crashes when the stream is empty.** `xReadGroup` has no `BLOCK`, so it returns
+  `null` immediately when there's nothing new, and the worker throws "Stream empty". Wait with
+  `BLOCK` and loop again instead of throwing.
+- [ ] **Pusher runs once and exits.** The `setInterval` is commented out, so websites are queued
+  once. Run it every 3 minutes (the interval the frontend assumes).
+- [ ] **No timeout on `axios.get`.** One site that never answers blocks the whole batch, because
+  `Promise.allSettled` waits for it. Set a timeout and record it as Down.
+- [ ] `console.log(promisesAxiosArray)` inside the callback that builds `promisesAxiosArray`
+  throws a ReferenceError (the variable isn't initialised yet). Ticks still get written, but
+  every promise ends up rejected. Move the log after the `await`.
+- [ ] Messages are acked before they're checked, so a crash mid-batch loses them. Ack after the tick is written.
+
 ## Frontend (apps/web)
 
 - [x] `lib/data.ts`: list monitors from `GET /user/websites`; localStorage id list removed from
