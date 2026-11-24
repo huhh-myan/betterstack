@@ -225,3 +225,8 @@
   the live code always matches a commit.
 - [ ] **Redis password.** Live Redis has none (safe only because it listens on 127.0.0.1); needs
   `REDIS_URL` support in `packages/redis` first.
+- [ ] **Guard against the Docker/ufw bypass (see P107).** Live Postgres and Redis are safe because
+  they're published as `127.0.0.1:5432` / `127.0.0.1:6379`; a later `docker run -p 5432:5432` would
+  silently open them to the internet despite ufw. Make loopback the default: add
+  `{ "ip": "127.0.0.1" }` to `/etc/docker/daemon.json` on the server and restart Docker. After any
+  container change, check with `ss -tlnp` on the server and a port test from another machine.

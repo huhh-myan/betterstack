@@ -1292,6 +1292,24 @@ Several regions let you tell "the site is down" (most regions agree) from "one p
 ## 6. Open questions
 
 ### To do
+- [ ] (P107, added 2026-11-24) **To learn: Docker bypasses the ufw firewall.** Came up deploying to Vultr. My reaction: "pretty evil hiding this, I would have never known that exact IP would help me avoid this problem".
+  - **The problem it solves (or rather, causes):** on a server with `ufw` on and only 22/80/443 allowed, `docker run -p 5432:5432 postgres` still makes Postgres reachable from the whole internet. `ufw status` keeps saying 5432 is closed. Many real database leaks happened exactly like this.
+  - **How it works:**
+    - `ufw` and Docker are both front-ends to the same kernel packet filter (`iptables`/`nftables`). Rules live in **chains**: INPUT (traffic addressed *to this machine*), FORWARD (traffic passing *through* to another host), OUTPUT, plus a NAT table that can rewrite addresses.
+    - `ufw` puts its rules in **INPUT**.
+    - Publishing `-p 5432:5432` makes Docker add a **NAT (DNAT) rule**: incoming traffic for port 5432 gets its destination rewritten to the container's internal address (e.g. `172.17.0.2:5432`).
+    - After the rewrite, the packet is no longer "for this machine" but "for another host" (the container), so it goes through **FORWARD**, which Docker manages and allows. It never passes ufw's INPUT rules.
+  - **The fix used on the server:** publish as `-p 127.0.0.1:5432:5432`. Docker then listens only on the loopback address, so only connections that start on the server match. Traffic from the internet arrives on `107.191.40.90`, where nothing listens on 5432.
+  - **Other ways to handle it:**
+    - Don't publish the port at all: containers on the same Docker network reach each other by name (`postgres:5432`) with no `-p`. The normal Docker Compose approach; not usable here because the apps run outside Docker.
+    - The `DOCKER-USER` chain: Docker never touches it and its rules run before Docker's own, so block/allow published ports there.
+    - `/etc/docker/daemon.json` with `"ip": "127.0.0.1"`: makes loopback the default bind address for every published port.
+  - **How to check on any server:** `ss -tlnp` shows the real address each port listens on: `0.0.0.0:5432` or `*:5432` = open to everyone, `127.0.0.1:5432` = local only. Then test from a *different* machine (as done for this deploy: 3000, 5432, 6379 blocked). Don't trust `ufw status` for Docker ports.
+  - **Gotchas / would have missed:**
+    - The same applies to any container with a published port (Redis with no password behind `-p 6379:6379` is a classic way to get a server taken over).
+    - Fixing it later means recreating the container: `docker run` options can't be changed on an existing container (the data survives if it's in a named volume).
+  - **Connects to:** P30 (connection URLs: `localhost` vs a real host), P104 (central Redis must never be public), and the localhost question I asked during the deploy ("can't anyone just use it by going to that port?").
+  - **Read:** Docker docs "Packet filtering and firewalls" (`https://docs.docker.com/engine/network/packet-filtering-firewalls/`), including the ufw section; `man ufw`; DigitalOcean/ArchWiki articles on iptables chains.
 - [ ] (P106, added 2026-11-24) **To learn: RAM, swap, and the OOM killer.** Came up deploying to a 1.6 GB Vultr server, where `next build` had to share memory with Postgres, Redis and four Bun apps. My first reaction: "what the fuck is a swap file".
   - **The problem it solves:** every running program keeps its working data in RAM, and RAM is small (1.6 GB here). When programs together ask for more than exists, the OS has to do *something*. Without swap the only option is to kill a process.
   - **How it works:**
