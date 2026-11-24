@@ -15,16 +15,16 @@ Status-code cleanup lives in `TODO.md` on `main`.
 
 ## Checker pipeline (apps/pusher, apps/worker): needed for real ticks
 
-- [ ] **Region 1 must exist.** The worker writes every tick with `region_id: 1` (and reads as
+- [x] **Region 1 must exist.** (Fixed: `/region/create` no longer passes an id.) The worker writes every tick with `region_id: 1` (and reads as
   consumer group `"1"`). `POST /region/create` picks a random id, so region 1 usually doesn't
   exist and every tick insert fails on the foreign key. Either let the DB assign the id
   (drop the random `id` so autoincrement gives the first region 1) or read the region id from env.
-- [ ] **Consumer group `1` must exist before the pusher runs.** `XGROUP CREATE bstack:website 1 $ MKSTREAM`.
+- [ ] **Consumer group `1` must exist before the pusher runs** (manual for now; automating it is in `TODO.md` on `main`). `XGROUP CREATE bstack:website 1 $ MKSTREAM`.
   `$` means "only messages added after now", so create the group first.
-- [ ] **Worker crashes when the stream is empty.** `xReadGroup` has no `BLOCK`, so it returns
+- [x] **Worker crashes when the stream is empty.** (Fixed: `BLOCK: 0` in `xReadGroup`.) `xReadGroup` has no `BLOCK`, so it returns
   `null` immediately when there's nothing new, and the worker throws "Stream empty". Wait with
   `BLOCK` and loop again instead of throwing.
-- [ ] **Pusher runs once and exits.** The `setInterval` is commented out, so websites are queued
+- [x] **Pusher runs once and exits.** (Fixed: `setInterval` is back.) Still to do: call `main()` once at startup too, or the first push waits 3 minutes. The `setInterval` is commented out, so websites are queued
   once. Run it every 3 minutes (the interval the frontend assumes).
 - [ ] **No timeout on `axios.get`.** One site that never answers blocks the whole batch, because
   `Promise.allSettled` waits for it. Set a timeout and record it as Down.
