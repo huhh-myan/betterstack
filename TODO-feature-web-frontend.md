@@ -5,22 +5,30 @@ Status-code cleanup lives in `TODO.md` on `main`.
 
 ## Backend (apps/api/index.ts)
 
-- [ ] **`GET /user/website/:id` filters on a field that doesn't exist.** The `where` uses
-  `website_id`, but on `Website` the field is `id` (`website_id` is a column on `WebsiteTicks`).
-- [ ] **`GET /user/website/:id` returns an array.** `.all()` gives an array, so
-  `websiteWithTicks.ticks` is undefined. Use `.first()` so a missing or foreign website comes
-  back as `null`.
-- [ ] **`GET /user/website/:id` drops website fields.** `.select("url")` leaves out `id`,
-  `timeAdded` and `user_id`, which the frontend's `Website` type needs. Drop the `select`.
-- [ ] **`GET /user/website/:id` returns every tick ever recorded.** Limit the include to the last
-  24 hours (`createdAt` gte now minus 24h), which is the window the frontend draws.
-- [ ] **`GET /user/website/:id` response key.** The frontend reads `{ website }`. Either return the
-  website-with-ticks under `website` or update `apps/web/lib/api.ts` to match.
-- [ ] **`DELETE /user/website/:id` fails for any website with ticks.** The foreign key from
-  `WebsiteTicks` blocks it until cascade lands (see `TODO.md` on `main`). Check ownership first,
-  then delete the website's ticks, then the website. Deleting ticks by `website_id` before the
-  ownership check would let any logged-in user wipe another user's ticks.
-- [ ] Remove the unused `websiteTicks` variable in `GET /user/website/:id`.
+- [x] `GET /user/website/:id` filters on `id` (was `website_id`).
+- [x] `GET /user/website/:id` uses `.first()` (was `.all()`).
+- [x] `GET /user/website/:id` no longer narrows fields with `.select("url")`.
+- [ ] **`GET /user/website/:id` include callback returns nothing.** The callback has a block body
+  `{ tick.where(...) }` with no `return`, so the refinement is lost.
+- [ ] **`GET /user/website/:id` time filter is wrong.** `createdAt.gt(Date.now())` asks for ticks
+  newer than now, which matches none. It needs ticks newer than now minus 24 hours, passed as a
+  `Date` rather than a number.
+- [ ] **`GET /user/website/:id` crashes on someone else's website.** `.first()` returns `null`
+  for a missing or foreign website, and `websiteWithTicks.ticks` then throws, so the route
+  answers 400. Remove that unused line.
+- [ ] **`(tick: any)` / `(t: any)` annotations.** They switch off the ORM's typing, which would
+  have flagged the two bugs above. Let the types be inferred.
+- [ ] **`GET /user/website/:id` response key.** The frontend reads `{ website }`, the route
+  returns `{ websiteWithTicks }`. Rename one side.
+- [x] `DELETE /user/website/:id` deletes ticks before the website (race tracked in `TODO.md` on `main`).
+- [ ] **`DELETE /user/website/:id` model name.** It uses `db.orm.public.websiteTicks`; the model is
+  `WebsiteTicks`. The lowercase name is undefined, so every delete throws.
+- [ ] **`DELETE /user/website/:id` has no ownership check before the tick delete.** Ticks are
+  deleted by `website_id` alone, so any logged-in user can wipe another user's ticks (the
+  website delete then matches nothing and the route still says "Successfully deleted"). Look up
+  the website by `id` and `user_id` first and stop if it's `null`.
+- [ ] **`DELETE /user/website/:id` `.deleteAll({})`.** The ORM docs show `deleteAll()` with no
+  argument; check whether the `{}` is accepted.
 
 ## Frontend (apps/web)
 
