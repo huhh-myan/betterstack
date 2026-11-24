@@ -1278,6 +1278,15 @@ Several regions let you tell "the site is down" (most regions agree) from "one p
 ## 6. Open questions
 
 ### To do
+- [ ] (P100, added 2026-11-24) **To learn: IPv4 vs IPv6, and why google.com showed Down.** On `feature/ai-changed`, `www.google.com` and `google.com` were Down on every check (`timed out after 10000 ms`) while `example.com` was Up. The cause: Google has IPv6 (AAAA) addresses, my network can't route IPv6, and Bun connected to the IPv6 address without falling back to IPv4. The fix is in `apps/worker/check.ts` on that branch, and the full debugging story is in P100 of the current log (`d:\cohort\betteruptime\learning\bun-init-log.md`). Cover:
+  - **The problem IPv6 solves:** IPv4 has about 4.3 billion addresses (32 bits), and they ran out. IPv6 has 128 bits. Why NAT kept IPv4 alive, and what it costs.
+  - **Address formats:** `142.251.156.119` vs `2001:4860:482d:7700::`. What `::` means. Loopback `127.0.0.1` vs `::1`. Private ranges (`10.x`, `192.168.x`) vs IPv6 link-local (`fe80::`).
+  - **DNS records:** `A` = IPv4, `AAAA` = IPv6. One hostname can have both. Experiment: `Resolve-DnsName www.google.com`.
+  - **Dual stack:** when a host has both, which one does a client try first? **Happy Eyeballs** (RFC 8305): try both almost at once, use whichever connects first. Browsers and curl do it, Node 20+ does it (`autoSelectFamily`), and Bun 1.3 didn't in my test.
+  - **Why it hung instead of failing fast:** with no route, the connection attempt gets no answer at all, so it waits for the timeout. Compare with "connection refused" (the host answered "no") and "DNS lookup failed" (no address at all).
+  - **Experiment:** predict, then run `curl.exe -4 -s -o NUL -w "%{http_code} %{time_total}" https://www.google.com` and the same with `-6`. Then check whether my network has IPv6 at all (`ipconfig`, look for a global IPv6 address, not just `fe80::`).
+  - **Why it matters for an uptime monitor:** a false Down is worse than no monitor. Real monitors record which IP they connected to and sometimes check both families separately.
+  - Sources: RFC 8305 (Happy Eyeballs v2), https://www.rfc-editor.org/rfc/rfc8305 · Cloudflare Learning "What is IPv6?", https://www.cloudflare.com/learning/network-layer/what-is-ipv6/ · Node `net.setDefaultAutoSelectFamily`, https://nodejs.org/api/net.html#netsetdefaultautoselectfamilyvalue
 - [ ] (P11) Use **Bun catalogs** to manage shared package versions in the monorepo (typescript first, then others shared by api/web/packages). Docs: https://bun.com/docs/pm/catalogs
 - [ ] (P10) Decide: move `typescript` in apps/api from peerDependencies to devDependencies (or rely on the root/catalog).
 - [ ] (P12) Move `@repo/typescript-config` in apps/api to devDependencies, and fix the two tsconfig comments.
