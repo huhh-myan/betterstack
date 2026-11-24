@@ -143,3 +143,14 @@
   - Keep it under ~10 seconds: `docker stop` sends `SIGKILL` after that, which can't be handled.
   - Test `SIGTERM` handling on Linux or in Docker; on Windows it doesn't fire for Task Manager
     or `taskkill`.
+
+## Check semantics
+
+- [ ] **Any non-2xx response counts as Down, and the reason isn't stored.** `axios.get` throws on
+  4xx/5xx, and the worker's `catch` records every throw as Down. Seen on 2026-11-24: the
+  `https://example.com/a10`-style monitors are Down because the path returns 404, in the same
+  ~50–130 ms as a real failure, and `not-so-worthu.in` is Down because DNS doesn't resolve. All
+  three look identical in the data. Decide what Down means (5xx and network errors only? a
+  per-monitor expected status?), and store the HTTP status code or error kind on the tick so the
+  dashboard can say *why* it's down. `validateStatus` in the axios request config controls which
+  statuses throw.
