@@ -1,12 +1,9 @@
-// Everything here is simulated in the browser.
-//
-// 1. `simulateTicks` invents check results for a website. The API stores ticks
-//    (apps/worker writes them) but has no endpoint to read them yet, so the UI
-//    uses these in every mode and labels them as simulated.
-// 2. `mockBackend` stands in for the whole API when NEXT_PUBLIC_MOCK=1.
+// Demo mode only (NEXT_PUBLIC_MOCK=1): an in-browser stand-in for the whole API.
+// `simulateTicks` invents check results, since no worker runs in demo mode.
+// With the real API none of this is used.
 
 import { storage } from "./session";
-import type { Region, TickStatus, Website, WebsiteTick } from "./types";
+import type { Region, RegionRequest, TickStatus, Website, WebsiteTick } from "./types";
 
 /** The pusher is meant to enqueue every website every 3 minutes. */
 export const CHECK_INTERVAL_MS = 3 * 60 * 1000;
@@ -79,10 +76,20 @@ export function simulateTicks(website: Website, regions: Region[], now = Date.no
           ? Math.round(base + regionOffset + jitter + spike)
           : Math.round(2000 + rand(website.id, slot, region.id, "t") * 8000);
 
+      const failure = rand(website.id, slot, region.id, "why");
       ticks.push({
         id: id++,
         response_time_ms: Math.max(12, response),
         status,
+        http_status: status === "Up" ? 200 : status === "Unknown" ? 429 : failure > 0.5 ? 503 : null,
+        error:
+          status === "Up"
+            ? null
+            : status === "Unknown"
+              ? "HTTP 429 (rate limited)"
+              : failure > 0.5
+                ? "HTTP 503"
+                : "timed out after 10000 ms",
         createdAt: new Date(slot * CHECK_INTERVAL_MS + ri * 1500).toISOString(),
         region_id: region.id,
         website_id: website.id,
@@ -92,15 +99,16 @@ export function simulateTicks(website: Website, regions: Region[], now = Date.no
   return ticks;
 }
 
-// --- Full mock backend (NEXT_PUBLIC_MOCK=1) ----------------------------------
+// --- Mock backend -------------------------------------------------------------
 
 interface MockDb {
   users: { id: string; username: string; password: string }[];
   websites: Website[];
   regions: Region[];
+  requests: RegionRequest[];
 }
 
-const DB_KEY = "bstack:mock-db";
+const DB_KEY = "bstack:mock-db:v2";
 
 function load(): MockDb {
   try {
@@ -109,7 +117,7 @@ function load(): MockDb {
   } catch {
     // fall through to a fresh db
   }
-  return { users: [], websites: [], regions: [...FALLBACK_REGIONS] };
+  return { users: [], websites: [], regions: [...FALLBACK_REGIONS], requests: [] };
 }
 
 function save(db: MockDb) {
@@ -122,6 +130,9 @@ const uuid = () =>
     : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
 
 const delay = (ms = 250) => new Promise((r) => setTimeout(r, ms));
+
+/** Demo mode: usernames starting with "admin" are admins, so both views can be tried. */
+export const isMockAdmin = (username: string) => username.toLowerCase().startsWith("admin");
 
 const DEMO_SITES = [
   "https://example.com",
@@ -153,7 +164,7 @@ export const mockBackend = {
     let user = db.users.find((u) => u.username === username);
     // Demo mode: any credentials work; unknown usernames get an account.
     if (!user) user = await mockBackend.signup(username, password);
-    return { userId: user.id, token: `mock.${user.id}` };
+    return { userId: user.id, token: `mock.${user.id}`, isAdmin: isMockAdmin(username) };
   },
 
   async listWebsites(userId: string) {
@@ -190,9 +201,55 @@ export const mockBackend = {
   async createRegion(name: string) {
     await delay();
     const db = load();
+    if (db.regions.some((r) => r.name === name)) throw new Error(`Region "${name}" already exists.`);
     const region = { id: Math.max(0, ...db.regions.map((r) => r.id)) + 1, name };
     db.regions.push(region);
     save(db);
-    return { message: `${name} created!` };
+    return region;
+  },
+
+  async requestRegion(userId: string, username: string, name: string, reason?: string) {
+    await delay();
+    const db = load();
+    if (db.regions.some((r) => r.name === name)) throw new Error(`Region "${name}" already exists.`);
+    if (db.requests.some((r) => r.user_id === userId && r.name === name && r.status === "Pending")) {
+      throw new Error(`You already asked for "${name}". An admin will review it.`);
+    }
+    const request: RegionRequest = {
+      id: Math.max(0, ...db.requests.map((r) => r.id)) + 1,
+      name,
+      reason: reason || null,
+      status: "Pending",
+      user_id: userId,
+      username,
+      createdAt: new Date().toISOString(),
+      decidedAt: null,
+    };
+    db.requests.unshift(request);
+    save(db);
+    return request;
+  },
+
+  async listRegionRequests(userId: string, admin: boolean) {
+    await delay(150);
+    const all = load().requests;
+    return admin ? all : all.filter((r) => r.user_id === userId);
+  },
+
+  async decideRegionRequest(id: number, decision: "approve" | "reject") {
+    await delay();
+    const db = load();
+    const request = db.requests.find((r) => r.id === id);
+    if (!request) throw new Error("Request not found.");
+    if (request.status !== "Pending") throw new Error(`This request was already ${request.status.toLowerCase()}.`);
+    if (decision === "approve") {
+      if (db.regions.some((r) => r.name === request.name)) throw new Error(`Region "${request.name}" already exists.`);
+      db.regions.push({ id: Math.max(0, ...db.regions.map((r) => r.id)) + 1, name: request.name });
+    }
+    request.status = decision === "approve" ? "Approved" : "Rejected";
+    request.decidedAt = new Date().toISOString();
+    save(db);
+    return request;
   },
 };
+

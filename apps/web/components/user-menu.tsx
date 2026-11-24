@@ -30,7 +30,10 @@ export function UserMenu({ session }: { session: Session }) {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="flex flex-col gap-0.5">
-            <span className="truncate text-sm font-medium text-foreground">{session.username}</span>
+            <span className="truncate text-sm font-medium text-foreground">
+              {session.username}
+              {session.isAdmin ? <span className="ml-1.5 text-xs font-normal text-muted-foreground">(admin)</span> : null}
+            </span>
             <span className="truncate font-mono text-[11px] font-normal">{session.userId}</span>
           </DropdownMenuLabel>
         </DropdownMenuGroup>

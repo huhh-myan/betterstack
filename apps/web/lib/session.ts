@@ -46,7 +46,7 @@ export function getSession(): Session | null {
   cachedRaw = raw;
   try {
     const parsed = raw ? (JSON.parse(raw) as Session) : null;
-    cachedSession = parsed && !isExpired(parsed.token) ? parsed : null;
+    cachedSession = parsed && !isExpired(parsed.token) ? { ...parsed, isAdmin: !!parsed.isAdmin } : null;
   } catch {
     cachedSession = null;
   }
@@ -68,30 +68,6 @@ export function subscribeSession(listener: () => void) {
     listeners.delete(listener);
     window.removeEventListener("storage", onStorage);
   };
-}
-
-// --- Websites this browser knows about ---------------------------------------
-// The API has no "list my websites" endpoint yet, so we remember the ids of the
-// websites created here (per user) and fetch each one by id.
-
-const sitesKey = (userId: string) => `bstack:websites:${userId}`;
-
-export function getKnownWebsiteIds(userId: string): string[] {
-  try {
-    const ids = JSON.parse(safeGet(sitesKey(userId)) ?? "[]");
-    return Array.isArray(ids) ? ids.filter((x) => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-export function rememberWebsiteId(userId: string, id: string) {
-  const ids = getKnownWebsiteIds(userId);
-  if (!ids.includes(id)) safeSet(sitesKey(userId), JSON.stringify([id, ...ids]));
-}
-
-export function forgetWebsiteId(userId: string, id: string) {
-  safeSet(sitesKey(userId), JSON.stringify(getKnownWebsiteIds(userId).filter((x) => x !== id)));
 }
 
 export const storage = { get: safeGet, set: safeSet };

@@ -43,7 +43,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UptimeBar } from "@/components/uptime-bar";
 import { useQuery } from "@/hooks/use-query";
-import { MOCK_MODE, getMonitor, removeMonitor } from "@/lib/data";
+import { getMonitor, removeMonitor } from "@/lib/data";
 import { formatDateTime, formatMs, formatPct, hostname, timeAgo } from "@/lib/format";
 import { currentStatus, regionsInTicks, responseSeries, summarize, uptimeBuckets } from "@/lib/stats";
 
@@ -134,9 +134,13 @@ export default function MonitorPage() {
   const { monitor, summary, status } = view;
 
   async function onRemove() {
-    await removeMonitor(session, monitor.id);
-    toast.success(MOCK_MODE ? "Monitor deleted" : "Removed from dashboard", { description: monitor.url });
-    router.push("/dashboard");
+    try {
+      await removeMonitor(session, monitor.id);
+      toast.success("Monitor deleted", { description: monitor.url });
+      router.push("/dashboard");
+    } catch (err) {
+      toast.error("Couldn't delete the monitor", { description: (err as Error).message });
+    }
   }
 
   return (
@@ -198,7 +202,7 @@ export default function MonitorPage() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onClick={() => setConfirmOpen(true)}>
-                <Trash2Icon /> {MOCK_MODE ? "Delete monitor" : "Remove from dashboard"}
+                <Trash2Icon /> Delete monitor
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -345,7 +349,9 @@ export default function MonitorPage() {
                       {t.status === "Up" ? (
                         formatMs(t.response_time_ms)
                       ) : (
-                        <span className="font-sans text-xs text-muted-foreground">Failed</span>
+                        <span className="font-sans text-xs text-muted-foreground" title={t.error ?? undefined}>
+                          {t.error ?? (t.http_status ? `HTTP ${t.http_status}` : "Failed")}
+                        </span>
                       )}
                     </TableCell>
                   </TableRow>
@@ -366,25 +372,16 @@ export default function MonitorPage() {
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{MOCK_MODE ? "Delete this monitor?" : "Remove from dashboard?"}</DialogTitle>
+            <DialogTitle>Delete this monitor?</DialogTitle>
             <DialogDescription>
-              {MOCK_MODE ? (
-                <>
-                  <span className="font-mono">{monitor.url}</span> and its history will be deleted from the demo data.
-                </>
-              ) : (
-                <>
-                  The API has no delete endpoint yet, so this only hides{" "}
-                  <span className="font-mono">{monitor.url}</span> in this browser. It stays in the database and keeps
-                  being checked. You can add it back by its id.
-                </>
-              )}
+              <span className="font-mono">{monitor.url}</span> and all of its check history will be deleted. This
+              can&apos;t be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
             <Button variant="destructive" onClick={onRemove}>
-              {MOCK_MODE ? "Delete" : "Remove"}
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

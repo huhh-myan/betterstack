@@ -1,19 +1,16 @@
 "use client";
 
-// The one place the UI gets data from. It hides two things:
-// - NEXT_PUBLIC_MOCK=1 swaps the real API for the in-browser mock backend.
-// - Gaps in the real API (no website list, no ticks) are filled in here:
-//   the website list comes from ids remembered in this browser, and ticks
-//   are simulated (see lib/mock.ts).
+// The one place the UI gets data from. With the real API every call goes to
+// apps/api; with NEXT_PUBLIC_MOCK=1 the in-browser mock backend answers instead.
 
 import { ApiError, api } from "./api";
 import { mockBackend, simulateTicks } from "./mock";
-import { forgetWebsiteId, getKnownWebsiteIds, rememberWebsiteId, setSession } from "./session";
-import type { Monitor, Region, Session, Website } from "./types";
+import { setSession } from "./session";
+import type { Monitor, Region, RegionRequest, Session, Website } from "./types";
 
 export const MOCK_MODE = process.env.NEXT_PUBLIC_MOCK === "1";
 
-/** Signs the user out when the API rejects the token. */
+/** Signs the user out when the API says the token is no good (401). */
 async function authed<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
@@ -23,40 +20,24 @@ async function authed<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+// --- Auth ---------------------------------------------------------------------
+
 export async function signIn(username: string, password: string): Promise<Session> {
   if (MOCK_MODE) {
-    const { userId, token } = await mockBackend.signin(username, password);
-    return { userId, token, username };
+    const { userId, token, isAdmin } = await mockBackend.signin(username, password);
+    return { userId, token, username, isAdmin };
   }
-  const { user_id, token } = await api.signin(username, password);
-  return { userId: user_id, token, username };
+  const { token, user } = await api.signin(username, password);
+  return { userId: user.id, token, username: user.username, isAdmin: user.isAdmin };
 }
 
 export async function signUp(username: string, password: string): Promise<Session> {
   if (MOCK_MODE) await mockBackend.signup(username, password);
-  else {
-    try {
-      await api.signup(username, password);
-    } catch (e) {
-      // The API answers 409 for any create failure; a taken username is the usual cause.
-      if (e instanceof ApiError && e.status === 409) {
-        throw new ApiError("That username is already taken.", 409);
-      }
-      throw e;
-    }
-  }
+  else await api.signup(username, password);
   return signIn(username, password);
 }
 
-export async function listRegions(session: Session): Promise<Region[]> {
-  if (MOCK_MODE) return mockBackend.listRegions();
-  return authed(() => api.listRegions(session.token));
-}
-
-export async function createRegion(session: Session, name: string): Promise<string> {
-  if (MOCK_MODE) return (await mockBackend.createRegion(name)).message;
-  return authed(async () => (await api.createRegion(session.token, name)).message);
-}
+// --- Monitors -----------------------------------------------------------------
 
 async function regionsOrEmpty(session: Session): Promise<Region[]> {
   try {
@@ -67,62 +48,90 @@ async function regionsOrEmpty(session: Session): Promise<Region[]> {
   }
 }
 
-function toMonitor(website: Website, regions: Region[]): Monitor {
-  return { ...website, ticks: simulateTicks(website, regions), simulatedTicks: true };
-}
-
-async function fetchWebsite(session: Session, id: string): Promise<Website | null> {
-  if (MOCK_MODE) return mockBackend.getWebsite(session.userId, id);
-  const { website } = await authed(() => api.getWebsite(session.token, id));
-  return website;
-}
+const withMockTicks = (w: Website, regions: Region[]): Monitor => ({ ...w, ticks: simulateTicks(w, regions) });
 
 export async function listMonitors(session: Session): Promise<{ monitors: Monitor[]; regions: Region[] }> {
-  const regions = await regionsOrEmpty(session);
-  let websites: Website[];
   if (MOCK_MODE) {
-    websites = await mockBackend.listWebsites(session.userId);
-  } else {
-    const ids = getKnownWebsiteIds(session.userId);
-    const results = await Promise.allSettled(ids.map((id) => fetchWebsite(session, id)));
-    const unauthorized = results.find(
-      (r) => r.status === "rejected" && r.reason instanceof ApiError && r.reason.unauthorized,
-    );
-    if (unauthorized?.status === "rejected") throw unauthorized.reason;
-    websites = results.flatMap((r) => (r.status === "fulfilled" && r.value ? [r.value] : []));
+    const [websites, regions] = await Promise.all([
+      mockBackend.listWebsites(session.userId),
+      mockBackend.listRegions(),
+    ]);
+    return { monitors: websites.map((w) => withMockTicks(w, regions)), regions };
   }
-  return { monitors: websites.map((w) => toMonitor(w, regions)), regions };
+  const [{ websites }, regions] = await Promise.all([
+    authed(() => api.listWebsites(session.token)),
+    regionsOrEmpty(session),
+  ]);
+  return { monitors: websites, regions };
 }
 
 export async function getMonitor(
   session: Session,
   id: string,
 ): Promise<{ monitor: Monitor | null; regions: Region[] }> {
-  const [website, regions] = await Promise.all([fetchWebsite(session, id), regionsOrEmpty(session)]);
-  return { monitor: website ? toMonitor(website, regions) : null, regions };
+  if (MOCK_MODE) {
+    const [website, regions] = await Promise.all([
+      mockBackend.getWebsite(session.userId, id),
+      mockBackend.listRegions(),
+    ]);
+    return { monitor: website ? withMockTicks(website, regions) : null, regions };
+  }
+  try {
+    const [{ website }, { ticks }, regions] = await Promise.all([
+      authed(() => api.getWebsite(session.token, id)),
+      authed(() => api.getTicks(session.token, id)),
+      regionsOrEmpty(session),
+    ]);
+    return { monitor: { ...website, ticks }, regions };
+  } catch (e) {
+    // 404: doesn't exist or isn't yours. The page shows "not found".
+    if (e instanceof ApiError && e.status === 404) return { monitor: null, regions: [] };
+    throw e;
+  }
 }
 
 export async function createMonitor(session: Session, url: string): Promise<Website> {
   if (MOCK_MODE) return mockBackend.createWebsite(session.userId, url);
   const { website } = await authed(() => api.createWebsite(session.token, url));
-  rememberWebsiteId(session.userId, website.id);
   return website;
 }
 
-/**
- * Real API: there is no delete endpoint, so this only hides the website in this
- * browser; it stays in the database and keeps being checked.
- * Mock mode: deletes it from the mock db.
- */
+/** Deletes the website and its check history. */
 export async function removeMonitor(session: Session, id: string): Promise<void> {
   if (MOCK_MODE) return mockBackend.deleteWebsite(session.userId, id);
-  forgetWebsiteId(session.userId, id);
+  await authed(() => api.deleteWebsite(session.token, id));
 }
 
-/** Lets the user add an existing website by id (e.g. one created with curl). */
-export async function trackExistingMonitor(session: Session, id: string): Promise<Website> {
-  const website = await fetchWebsite(session, id);
-  if (!website) throw new ApiError("No website with that id belongs to your account.", 404);
-  if (!MOCK_MODE) rememberWebsiteId(session.userId, website.id);
-  return website;
+// --- Regions ------------------------------------------------------------------
+
+export async function listRegions(session: Session): Promise<Region[]> {
+  if (MOCK_MODE) return mockBackend.listRegions();
+  return authed(() => api.listRegions(session.token));
+}
+
+/** Admins only. */
+export async function createRegion(session: Session, name: string): Promise<Region> {
+  if (MOCK_MODE) return mockBackend.createRegion(name);
+  return (await authed(() => api.createRegion(session.token, name))).region;
+}
+
+export async function requestRegion(session: Session, name: string, reason?: string): Promise<RegionRequest> {
+  if (MOCK_MODE) return mockBackend.requestRegion(session.userId, session.username, name, reason);
+  return (await authed(() => api.requestRegion(session.token, name, reason))).request;
+}
+
+/** Admins get every request; everyone else gets their own. */
+export async function listRegionRequests(session: Session): Promise<RegionRequest[]> {
+  if (MOCK_MODE) return mockBackend.listRegionRequests(session.userId, session.isAdmin);
+  return (await authed(() => api.listRegionRequests(session.token))).requests;
+}
+
+/** Admins only. Approving creates the region. */
+export async function decideRegionRequest(
+  session: Session,
+  id: number,
+  decision: "approve" | "reject",
+): Promise<RegionRequest> {
+  if (MOCK_MODE) return mockBackend.decideRegionRequest(id, decision);
+  return (await authed(() => api.decideRegionRequest(session.token, id, decision))).request;
 }

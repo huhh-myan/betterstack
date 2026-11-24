@@ -1,18 +1,23 @@
 // Thin client for the Express API in apps/api. Requests go to /api/* on this
 // app and next.config.js forwards them to the API server (which has no CORS).
 
-import type { Region, Website } from "./types";
+import type { Region, RegionRequest, Website, WebsiteTick } from "./types";
 
 export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public unauthorized = false,
   ) {
     super(message);
     this.name = "ApiError";
   }
+  /** The token is missing, invalid or expired: the user must sign in again. */
+  get unauthorized() {
+    return this.status === 401;
+  }
 }
+
+const UNREACHABLE = "Can't reach the API. Is apps/api running?";
 
 async function request<T>(
   path: string,
@@ -20,8 +25,7 @@ async function request<T>(
 ): Promise<T> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  // The API reads the raw JWT from Authorization, without a "Bearer " prefix.
-  if (token) headers["Authorization"] = token;
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
   let res: Response;
   try {
@@ -31,43 +35,60 @@ async function request<T>(
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError("Can't reach the API. Is apps/api running?", 0);
+    throw new ApiError(UNREACHABLE, 0);
   }
 
+  if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    // The Next.js proxy answers 500 with an HTML page when the API is down.
-    if (data === null) throw new ApiError("Can't reach the API. Is apps/api running?", res.status);
-    const message: string = data.meme ?? data.message ?? `Request failed (${res.status})`;
-    // jsonMiddleware answers 400 "Authorization Error!" for a missing or bad token.
-    throw new ApiError(message, res.status, data.message === "Authorization Error!");
+    // The Next.js proxy answers with an HTML error page when the API is down.
+    if (data === null) throw new ApiError(UNREACHABLE, res.status);
+    throw new ApiError(data.message ?? `Request failed (${res.status})`, res.status);
   }
   return data as T;
 }
 
+export interface ApiUser {
+  id: string;
+  username: string;
+  isAdmin: boolean;
+}
+
 export const api = {
   signup: (username: string, password: string) =>
-    request<{ user_id: { id: string; username: string } }>("/signup", {
-      method: "POST",
-      body: { username, password },
-    }),
+    request<{ user: { id: string; username: string } }>("/signup", { method: "POST", body: { username, password } }),
 
   signin: (username: string, password: string) =>
-    request<{ user_id: string; token: string }>("/signin", {
-      method: "POST",
-      body: { username, password },
-    }),
+    request<{ token: string; user: ApiUser }>("/signin", { method: "POST", body: { username, password } }),
 
-  me: (token: string) => request<{ user_id: string }>("/user", { token }),
+  me: (token: string) => request<ApiUser>("/user", { token }),
+
+  listWebsites: (token: string) =>
+    request<{ websites: (Website & { ticks: WebsiteTick[] })[] }>("/user/websites", { token }),
 
   createWebsite: (token: string, url: string) =>
     request<{ website: Website }>("/user/website/create", { method: "POST", token, body: { url } }),
 
   getWebsite: (token: string, id: string) =>
-    request<{ website: Website | null }>(`/user/website/${encodeURIComponent(id)}`, { token }),
+    request<{ website: Website }>(`/user/website/${encodeURIComponent(id)}`, { token }),
+
+  getTicks: (token: string, id: string, hours = 24) =>
+    request<{ ticks: WebsiteTick[] }>(`/user/website/${encodeURIComponent(id)}/ticks?hours=${hours}`, { token }),
+
+  deleteWebsite: (token: string, id: string) =>
+    request<void>(`/user/website/${encodeURIComponent(id)}`, { method: "DELETE", token }),
 
   listRegions: (token: string) => request<Region[]>("/region/list", { token }),
 
   createRegion: (token: string, name: string) =>
-    request<{ message: string }>("/region/create", { method: "POST", token, body: { name } }),
+    request<{ region: Region; message: string }>("/region/create", { method: "POST", token, body: { name } }),
+
+  requestRegion: (token: string, name: string, reason?: string) =>
+    request<{ request: RegionRequest }>("/region/request", { method: "POST", token, body: { name, reason } }),
+
+  listRegionRequests: (token: string) =>
+    request<{ requests: RegionRequest[]; isAdmin: boolean }>("/region/requests", { token }),
+
+  decideRegionRequest: (token: string, id: number, decision: "approve" | "reject") =>
+    request<{ request: RegionRequest }>(`/region/requests/${id}/${decision}`, { method: "POST", token }),
 };

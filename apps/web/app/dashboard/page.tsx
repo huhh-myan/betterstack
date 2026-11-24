@@ -17,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UptimeBar } from "@/components/uptime-bar";
 import { useQuery } from "@/hooks/use-query";
-import { MOCK_MODE, listMonitors } from "@/lib/data";
+import { listMonitors } from "@/lib/data";
 import { formatMs, formatPct, hostname, timeAgo } from "@/lib/format";
 import { currentStatus, summarize, uptimeBuckets } from "@/lib/stats";
 
@@ -105,10 +105,8 @@ export default function DashboardPage() {
               </EmptyMedia>
               <EmptyTitle>No monitors yet</EmptyTitle>
               <EmptyDescription>
-                Add a URL and we&apos;ll start checking it from every region.
-                {!MOCK_MODE
-                  ? " Websites created before through the API can be added by id from the same dialog."
-                  : null}
+                Add a URL and we&apos;ll start checking it from every region. Results show up after the next
+                check, within a few minutes.
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
