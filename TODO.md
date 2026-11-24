@@ -87,13 +87,21 @@
     doesn't solve it.
   - **Progress on `feature/web-frontend`:** `packages/redis/index.ts` now makes `redisClientWorker`
     with `redisClient.duplicate()` and uses it for `xRead`, `xReadGroup` and `xAck`. Left to do:
-    - [ ] **`connect()` the duplicate.** `duplicate()` only builds a new client object; it isn't
-      connected. Every command on it fails with `ClientClosedError: The client is closed`
-      until `await redisClientWorker.connect()` runs.
+    - [x] **`connect()` the duplicate.** Done: `createDuplicateRedisClient()` in
+      `packages/redis/index.ts` duplicates and connects it; the worker passes it to
+      `xReadGroup` and `xAck`.
+    - [ ] **The worker opens a new connection every loop and closes it mid-batch.**
+      `createDuplicateRedisClient()` is called inside `while(1)`, so every batch opens a fresh
+      TCP connection (and, without the close, leaks one per loop). `duplicateRedisClient.close()`
+      sits inside the `for` loop over the batch's messages, so it runs after the *first* ack;
+      the second `xAck` in the same batch then fails with `ClientClosedError` and the worker
+      crashes on any batch of 2+ messages (`COUNT` is 5). Create the duplicate once, before the
+      loop, and close it only on shutdown.
     - [ ] **Attach an `error` listener to the duplicate.** `duplicate()` copies the options, not
       the event listeners. Without `.on('error', …)`, a Redis error on that connection is an
       unhandled `error` event and crashes the process.
-    - [ ] **Move `xAck` back to `redisClient`.** The duplicate is the connection that blocks.
+    - [ ] **Move `xAck` back to `redisClient`.** (Still on the duplicate: `xAck` now takes the
+      worker's client as a parameter.) The duplicate is the connection that blocks.
       Putting `xAck` on it brings back the queue-behind-the-blocked-read problem the duplicate
       was meant to fix. Only the blocking read belongs on the duplicate.
     - [ ] **Every importer opens both connections.** The clients are created at module load, so
@@ -109,3 +117,13 @@
     connection unless the read has its own (the duplicate). More workers don't replace that fix.
   - Each worker needs a distinct `WORKER_ID`; two workers with the same consumer name share one
     pending list and can't tell whose messages are whose.
+
+## Rule: Redis needs a separate connection for blocking reads and pub/sub
+
+- [ ] Apply this everywhere Redis is used: **a connection that runs a blocking command
+  (`XREAD`/`XREADGROUP` with `BLOCK`, `BLPOP`, `BRPOP`, `BLMOVE`, `BZPOPMIN`…) or that
+  subscribes (`SUBSCRIBE`/`PSUBSCRIBE`) gets its own client**, made with `client.duplicate()` and
+  connected once. Normal commands stay on the main client. Reason: a blocked connection answers
+  nothing else until the blocking command returns, and a subscribed connection is in subscriber
+  mode and refuses normal commands altogether. Check this when adding a results stream, a
+  pub/sub channel for live dashboard updates, or more workers.
