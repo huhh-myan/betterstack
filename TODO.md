@@ -167,3 +167,27 @@
   per-monitor expected status?), and store the HTTP status code or error kind on the tick so the
   dashboard can say *why* it's down. `validateStatus` in the axios request config controls which
   statuses throw.
+
+## Multi-region: central Redis + Postgres, regional workers (see P104)
+
+- [ ] **Architecture:** one main server runs Postgres, Redis, the API, the web app and the pusher;
+  each region gets a small VM running only `apps/worker` with its own `REGION_ID` (and a unique
+  `WORKER_ID` per worker), connecting to the central Redis. One consumer group per region.
+- [ ] **Read `REGION_ID` / `WORKER_ID` from env.** Both are hardcoded to `"1"` in
+  `apps/worker/index.ts`, and the tick insert hardcodes `region_id: 1` separately from them.
+- [ ] **Redis URL from env.** `packages/redis` calls `createClient()` with no options, so it
+  only ever connects to `localhost:6379`. Regional workers need `REDIS_URL`.
+- [ ] **Lock Redis down before it's reachable from another machine.** It has no password today
+  (`requirepass` empty). Use a password or ACL user + TLS (`rediss://`), or keep it on a private
+  network (WireGuard/Tailscale/VPC) and never publish port 6379.
+- [ ] **Trim the stream.** `XADD` has no limit, so `bstack:website` grows forever (1,274 entries
+  locally on 2026-11-24). Add `MAXLEN ~ <n>` (or `MINID`) to the `xAdd` in `packages/redis`, sized
+  so every region's worker can fall behind a bit without losing messages.
+- [ ] **Persist Redis.** Turn on AOF (`appendonly yes`) and mount a named volume at `/data`, so a
+  restart or a recreated container doesn't lose the stream and the consumer groups.
+- [ ] **Recover stuck messages.** Messages delivered to a worker that died before acking stay in
+  its pending list. Run `XAUTOCLAIM` periodically so another worker in the group takes them over.
+- [ ] **Remove or serve consumer group `2`.** Locally it has no consumers and a lag of 1,172
+  messages. Either run a worker for region 2 or `XGROUP DESTROY` it.
+- [ ] **Later: workers send results to a stream instead of writing to Postgres.** One writer next
+  to the DB inserts ticks, so regional VMs need no DB credentials and the DB stays private.

@@ -1292,6 +1292,26 @@ Several regions let you tell "the site is down" (most regions agree) from "one p
 ## 6. Open questions
 
 ### To do
+- [ ] (P104, added 2026-11-24) **To learn: one central Redis (and Postgres) with workers in many regions.** Came up while choosing hosting: the plan is one main server with Redis + Postgres, plus a small VM per region running only the worker.
+  - **The problem it solves:** an uptime monitor should check each site *from several places*, so "down from India, up from Germany" can be told apart from "down everywhere". Every region needs the same list of websites at the same moment, and within one region several workers should share the work without checking a site twice. The pusher shouldn't have to know which regions or workers exist.
+  - **How streams + consumer groups do it (the core idea):**
+    - The pusher `XADD`s each website **once** to `bstack:website`.
+    - **Across groups, every group gets every message (fan-out).** One consumer group per region (`1` = india, `2` = …) means every region checks every website.
+    - **Inside a group, messages are split between consumers (load balancing).** Two workers in region 1 with different `WORKER_ID`s each get a different part of the batch.
+    - Each group has its own position in the stream ("last delivered id") and its own **pending list** (delivered but not yet acked). That's why group name = region id, and why each worker needs a unique consumer name.
+    - Seen live on 2026-11-24: `XINFO GROUPS bstack:website` showed group `1` with lag 0 and group `2` (no worker running) with **lag 1172**: messages piling up for a region nobody is serving.
+  - **What changes when Redis is far away:**
+    - *Latency:* a worker in Mumbai talking to Redis in Frankfurt pays ~100–200 ms per command. Fine here, because a worker sends few commands (one blocking read per batch of `COUNT` messages, then acks). It does **not** distort the measurement: `response_time_ms` is timed from the worker to the website, not to Redis.
+    - *Security:* Redis has **no password by default** (my local one: `requirepass` is empty) and speaks plain text. Exposed to the internet, anyone can read or wipe it. Options: password/ACL users + TLS, or a private network between the VMs (WireGuard, Tailscale, a cloud VPC) so Redis is never public.
+    - *Who writes ticks:* today each worker writes straight to Postgres, so every regional VM needs DB credentials and a DB connection over the internet. Alternative: workers `XADD` results to a second stream, and one writer next to the DB inserts them (the plan in the pusher's commit message). The DB stays private, and inserts can be batched.
+  - **Failure modes to know:**
+    - *Single point of failure:* if the central Redis is down, every region stops checking. That's acceptable at this size; the fixes later are replicas + Sentinel, or a managed Redis.
+    - *Persistence:* streams and consumer groups live in memory. My local Redis only snapshots (`save 3600 1 300 100 60 10000`) with `appendonly no`, so a crash loses up to a few minutes, and a container recreated without a volume loses the stream **and the consumer groups** (workers then fail until `XGROUP CREATE` runs again). Learn RDB vs AOF.
+    - *Unbounded growth:* `XADD` without a limit keeps every entry forever, and acking doesn't delete anything. Local stream: **1,274 entries** after one day of testing; in production that's 15 sites × 480 pushes/day and climbing. Learn `MAXLEN ~` / `MINID` on `XADD`, and `XTRIM`.
+    - *Stuck messages:* a worker that dies after reading but before acking leaves messages in its pending list forever. Learn `XPENDING` and `XAUTOCLAIM` (another consumer takes over messages idle longer than N ms).
+  - **Alternatives to read about (not to switch to now):** Kafka (partitions + consumer groups, same idea at a much larger scale), RabbitMQ (fanout exchange + one queue per region), NATS JetStream, AWS SQS + SNS fan-out. Comparing them with Redis streams is a good way to see which parts are the concept and which are just Redis.
+  - **Connects to:** P102 (the blocking read needs its own connection, and a remote one makes the reconnect/error handling matter more); P103 (graceful shutdown: ack before exiting, or messages sit in the pending list).
+  - **Read:** Redis docs "Redis Streams" (consumer groups section, `https://redis.io/docs/latest/develop/data-types/streams/`); Redis docs on persistence (`https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/`); Redis security (`https://redis.io/docs/latest/operate/oss_and_stack/management/security/`).
 - [ ] (P103, added 2026-11-24) **To learn: signals (`SIGINT`, `SIGTERM`, `SIGKILL`) and graceful shutdown.** Came up deciding when to close the worker's Redis connections (P102).
   - **The problem:** a long-running process (API, worker, pusher) gets stopped from outside: Ctrl+C, a deploy, `docker stop`, a crash of the machine. If it just dies, in-flight work is lost: a batch of websites read but not acked, a tick half-written, connections dropped without a goodbye. Signals are how the OS tells a process "stop now, please", so it gets a chance to finish cleanly first.
   - **What a signal is:** a small numbered message the OS delivers to a process. The process either handles it (runs your code) or gets the default action (usually: exit at once).
