@@ -144,6 +144,19 @@
   - Test `SIGTERM` handling on Linux or in Docker; on Windows it doesn't fire for Task Manager
     or `taskkill`.
 
+- [ ] **A new website waits up to 6 minutes for its first check.** The pusher's `setInterval`
+  fires every 3 minutes counted from when the *pusher* started, not from when a website was
+  created, and each run queues every website from the DB. Two delays stack up:
+  1. **No push at pusher startup.** There's no `main()` call before `setInterval`, so the first
+     push happens 3 minutes after the pusher starts. Fix: call `main()` once, then start the interval.
+  2. **The API never queues a new website.** A website created via `POST /user/website/create`
+     waits for the pusher's next run (0–3 minutes). Fix: `xAdd` the new website's `{ url, id }` to
+     `bstack:website` right after the insert, so the first check happens within about a second; the
+     pusher's interval takes over from there. Notes: the API then imports `packages/redis`, so it
+     must not create the blocking reader client (see "Every importer opens both connections");
+     and if the `xAdd` fails, the website is still created, so log the error rather than failing the
+     request (the next pusher run will pick it up anyway).
+
 ## Check semantics
 
 - [ ] **Any non-2xx response counts as Down, and the reason isn't stored.** `axios.get` throws on
