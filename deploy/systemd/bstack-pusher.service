@@ -1,0 +1,21 @@
+[Unit]
+Description=bstack pusher (queues websites every 3 min)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+User=bstack
+Group=bstack
+WorkingDirectory=/opt/bstack/apps/pusher
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+ExecStart=/usr/local/bin/bun index.ts
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

@@ -4,6 +4,7 @@ import * as jose from "jose";
 import { db } from "@repo/db-prisma/db";
 // import type { Request, Response } from "express";
 import { jsonMiddleware } from "./middleware";
+import { isMainThread } from "bun";
 
 const port = 3000;
 // add zod to all
@@ -121,31 +122,110 @@ app.post('/user/website/create',async (req, res)=>{
     }
 })
 
-app.get('/user/website/:id',async (req, res)=>{
-    const { id } = req.params;
-    // or take in url from input name,
-    // what if it should have multiple search options like name url and other
+app.get('/user/websites', async (req, res)=>{
+    const user_id = req.user_id;
 
     try {
+        //return selected things not everything
+        const websiteList =  await db.orm.public.Website.where({ user_id: user_id}).all()
 
-        //fucking this works even if user_id is blank just middleware saves this code
-        //fucking raw sql better than this shit and check
-        const website = await db.orm.public.Website.first({
-            user_id: req.user_id,
-            id
-        })
-
-        //add status code to positive response also 
         return res.status(200).json({
-            website,
+            websites: websiteList
         })
     } catch (error) {
-        return res.json(400).json({
-            error,
-            message: "error fetching website!"
+        return res.status(400).json({
+            message: "Error fetching website list!",
+            error
         })
     }
 })
+
+app.delete('/user/website/:id', async (req, res)=>{
+    const user_id = req.user_id;
+    const websiteId = req.params.id;
+
+    try {
+
+        const websiteToDelete = await db.orm.public.Website.where({
+            user_id: user_id,
+            id: websiteId
+        }).first();
+        if(!websiteToDelete){
+            throw new Error('website not found')
+        }
+
+        const deletedTicks = await db.orm.public.WebsiteTicks.where({website_id: websiteId}).deleteAll();
+        // if(!deletedTicks){
+        //     throw new Error("No website Found!")
+        // }
+        
+        const deletedWebsite = await db.orm.public.Website.where({
+            user_id: user_id,
+            id: websiteId
+        }).delete();
+
+        return res.status(200).json({
+            message:"Successfully deleted the website",
+            deletedWebsite
+        })
+    } catch (error) {
+        return res.status(404).json({
+            message: "error in website deletion",
+            error
+        })
+    }
+})
+
+//endpoint to get user ticks
+app.get('/user/website/:id', async (req, res)=>{
+
+    try {
+        const websiteWithTicks = await db.orm.public.Website.where({
+            id : req.params.id,
+            user_id: req.user_id,
+        }).include("ticks", (tick)=>
+            tick.where((t)=> t.createdAt.gt(new Date(Date.now()-24*60*60*1000)))
+        ).first();
+        // if(!websiteWithTicks){
+        //     throw new Error("user has no sucnh")
+        // }
+        // const websiteTicks = websiteWithTicks.ticks;
+        return res.status(200).json({
+            websiteWithTicks
+        })
+    } catch (error) {
+        return res.status(400).json({
+            message: "error fetching website ticks",
+            error
+        })
+    }
+})
+
+// app.get('/user/website/:id',async (req, res)=>{
+//     const { id } = req.params;
+//     // or take in url from input name,
+//     // what if it should have multiple search options like name url and other
+
+//     try {
+
+//         //fucking this works even if user_id is blank just middleware saves this code
+//         //fucking raw sql better than this shit and check
+//         const website = await db.orm.public.Website.first({
+//             user_id: req.user_id,
+//             id
+//         })
+
+//         //add status code to positive response also 
+//         return res.status(200).json({
+//             website,
+//         })
+//     } catch (error) {
+//         return res.json(400).json({
+//             error,
+//             message: "error fetching website!"
+//         })
+//     }
+// })
 
 
 //Regions
@@ -166,14 +246,13 @@ app.get('/region/list', async (req,res)=>{
 app.post('/region/create', async (req, res)=>{
     const  regionName  = req.body.name;
 
-    const id =  Math.random()*100000 + Math.random()*Math.random();
+    // const id =  Math.random()*100000 + Math.random()*Math.random();
     if(!regionName){
         return;
     }
     try{
 
         const region = await db.orm.public.Region.create({
-            id: Math.floor(id),
             name: regionName
         })
 

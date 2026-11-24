@@ -1,0 +1,21 @@
+[Unit]
+Description=bstack web (Next.js, port 3001)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+User=bstack
+Group=bstack
+WorkingDirectory=/opt/bstack/apps/web
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+ExecStart=/usr/local/bin/bun run start -- --hostname 127.0.0.1
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

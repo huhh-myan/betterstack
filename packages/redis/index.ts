@@ -1,4 +1,4 @@
-import { createClient } from "redis";
+import { createClient, type RedisClientType } from "redis";
 
 
 async function redisConnector() {
@@ -23,6 +23,15 @@ interface WebsiteXadd {
 
 
 const redisClient = await redisConnector();
+
+
+
+export async function createDuplicateRedisClient(){
+    const redisClientWorker = redisClient.duplicate();
+    const duplicateClient = await redisClientWorker.connect()
+    return duplicateClient;
+}
+
 
 export async function xAdd({url, id}:WebsiteXadd) {
     
@@ -49,7 +58,6 @@ export async function xRead() {
     // }catch(e){
     //     return 
     // }
-
     const readValue = await redisClient.xRead({ key: 'bstack:website', id:  '>'})
 }
 
@@ -68,14 +76,15 @@ export async function xRead() {
         // ]
     //}
 // [{ name: 'race:italy', messages: [{ id: '1692629925771-0', message: { rider: 'Castilla' } }] }]
-export async function xReadGroup(consumerGroup: string, workerId: string ){
+export async function xReadGroup(consumerGroup: string, workerId: string, redisClientWorker:RedisClientType){
     //replace the stream name bstack:website with global variable so that no need to manually hard code
-
-    const readValue = await redisClient.xReadGroup(`${consumerGroup}`, workerId, {
+    // await redisClientWorker.connect();
+    const readValue = await redisClientWorker.xReadGroup(`${consumerGroup}`, workerId, {
             key: 'bstack:website',
             id: '>'
         },{
-            'COUNT': 5
+            'COUNT': 5,
+            'BLOCK': 0
         }
     );
 
@@ -83,6 +92,7 @@ export async function xReadGroup(consumerGroup: string, workerId: string ){
 }
 
 export async function xAck(consumerGroup:string, streamId: string) {
+    // await redisClientWorker.connect();
     const ackedValue = await redisClient.xAck('bstack:website', consumerGroup, streamId);
 }
 

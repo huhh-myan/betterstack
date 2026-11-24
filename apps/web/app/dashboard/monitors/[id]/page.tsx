@@ -134,8 +134,13 @@ export default function MonitorPage() {
   const { monitor, summary, status } = view;
 
   async function onRemove() {
-    await removeMonitor(session, monitor.id);
-    toast.success(MOCK_MODE ? "Monitor deleted" : "Removed from dashboard", { description: monitor.url });
+    try {
+      await removeMonitor(session, monitor.id);
+    } catch (err) {
+      toast.error("Couldn't delete the monitor", { description: (err as Error).message });
+      return;
+    }
+    toast.success("Monitor deleted", { description: monitor.url });
     router.push("/dashboard");
   }
 
@@ -198,7 +203,7 @@ export default function MonitorPage() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onClick={() => setConfirmOpen(true)}>
-                <Trash2Icon /> {MOCK_MODE ? "Delete monitor" : "Remove from dashboard"}
+                <Trash2Icon /> Delete monitor
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -366,25 +371,16 @@ export default function MonitorPage() {
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{MOCK_MODE ? "Delete this monitor?" : "Remove from dashboard?"}</DialogTitle>
+            <DialogTitle>Delete this monitor?</DialogTitle>
             <DialogDescription>
-              {MOCK_MODE ? (
-                <>
-                  <span className="font-mono">{monitor.url}</span> and its history will be deleted from the demo data.
-                </>
-              ) : (
-                <>
-                  The API has no delete endpoint yet, so this only hides{" "}
-                  <span className="font-mono">{monitor.url}</span> in this browser. It stays in the database and keeps
-                  being checked. You can add it back by its id.
-                </>
-              )}
+              <span className="font-mono">{monitor.url}</span> and its check history will be deleted
+              {MOCK_MODE ? " from the demo data" : ""}. This can&apos;t be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
             <Button variant="destructive" onClick={onRemove}>
-              {MOCK_MODE ? "Delete" : "Remove"}
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

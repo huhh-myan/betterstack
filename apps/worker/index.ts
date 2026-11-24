@@ -1,4 +1,4 @@
-import { xAck, xReadGroup } from "@repo/redis-stream/index"
+import { createDuplicateRedisClient, xAck, xReadGroup } from "@repo/redis-stream/index"
 import axios from "axios";
 import { db } from "@repo/db-prisma/db";
 
@@ -38,7 +38,10 @@ async function fetchWebsite(url:string, websiteId: string) {
 async function main() {
     while(1){
         //read from the stream
-        const websitesFromStream = await xReadGroup(REGION_ID, WORKER_ID);
+
+        const duplicateRedisClient = await createDuplicateRedisClient();
+
+        const websitesFromStream = await xReadGroup(REGION_ID, WORKER_ID, duplicateRedisClient);
 
         if(!websitesFromStream){
             //have to do something instead of throwing error 
@@ -91,8 +94,8 @@ async function main() {
             // take message.url and hit the site
             // put the result of the hit in db or an queue
             // then acknowledge to the stream that the thing has been done
+            
         }))
-
 
         //call the website and store in db 
 

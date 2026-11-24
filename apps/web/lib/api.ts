@@ -1,7 +1,7 @@
 // Thin client for the Express API in apps/api. Requests go to /api/* on this
 // app and next.config.js forwards them to the API server (which has no CORS).
 
-import type { Region, Website } from "./types";
+import type { Region, Website, WebsiteWithTicks } from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -63,8 +63,16 @@ export const api = {
   createWebsite: (token: string, url: string) =>
     request<{ website: Website }>("/user/website/create", { method: "POST", token, body: { url } }),
 
+  listWebsites: (token: string) => request<{ websites: Website[] }>("/user/websites", { token }),
+
+  /** The website with its ticks from the last 24 hours, or null if it isn't the user's. */
   getWebsite: (token: string, id: string) =>
-    request<{ website: Website | null }>(`/user/website/${encodeURIComponent(id)}`, { token }),
+    request<{ websiteWithTicks: WebsiteWithTicks | null }>(`/user/website/${encodeURIComponent(id)}`, {
+      token,
+    }),
+
+  deleteWebsite: (token: string, id: string) =>
+    request<{ message: string }>(`/user/website/${encodeURIComponent(id)}`, { method: "DELETE", token }),
 
   listRegions: (token: string) => request<Region[]>("/region/list", { token }),
 
