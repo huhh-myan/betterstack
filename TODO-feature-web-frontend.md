@@ -6,13 +6,13 @@ Status-code cleanup lives in `TODO.md` on `main`.
 ## Backend (apps/api/index.ts)
 
 - [x] `GET /user/website/:id` filters on `id` (was `website_id`).
-- [x] `GET /user/website/:id` uses `.first()` (was `.all()`).
+- [ ] **`GET /user/website/:id` lost `.first()` again.** The braces fix removed it, so the chain
+  ends at `.include(...)` and no query runs. Add `.first()` back after the include.
+- [x] `GET /user/website/:id` include callback now has an expression body (logged as P101 on `main`).
 - [x] `GET /user/website/:id` no longer narrows fields with `.select("url")`.
-- [ ] **`GET /user/website/:id` include callback returns nothing.** The callback has a block body
-  `{ tick.where(...) }` with no `return`, so the refinement is lost.
-- [ ] **`GET /user/website/:id` time filter is wrong.** `createdAt.gt(Date.now())` asks for ticks
-  newer than now, which matches none. It needs ticks newer than now minus 24 hours, passed as a
-  `Date` rather than a number.
+- [ ] **`GET /user/website/:id` time filter is a number.** The 24h window is right now, but
+  `Date.now() - 24*60*60*1000` is a number of milliseconds and `createdAt` is a `DateTime`.
+  Wrap it in `new Date(...)`.
 - [ ] **`GET /user/website/:id` crashes on someone else's website.** `.first()` returns `null`
   for a missing or foreign website, and `websiteWithTicks.ticks` then throws, so the route
   answers 400. Remove that unused line.
