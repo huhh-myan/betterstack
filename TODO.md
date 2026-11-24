@@ -52,3 +52,36 @@
     already exists. This is the usual pattern: the worker is the one that needs the group, and it
     also covers regions created before this change.
   - Until then: document the `XGROUP CREATE` step in RUN.md as a manual step before starting.
+- [ ] **The blocking stream read ties up the shared Redis connection.**
+  - **What happens:** `packages/redis/index.ts` makes one client at module level (`redisClient`)
+    and every function in the package uses it: `xAdd`, `xReadGroup`, `xAck`. That client is one
+    TCP connection. Redis answers commands on a connection strictly in the order they were sent.
+    `xReadGroup` uses `BLOCK: 0`, which means "don't reply until a message arrives, however long
+    that takes". While it waits, every other command sent on the same connection sits in the
+    queue behind it and gets no reply either.
+  - **Why it's fine today:** the worker does one thing at a time. It reads, and only after the
+    read returns does it ack and write ticks (ticks go to Postgres, not Redis). Nothing else
+    uses Redis in the worker process while the read is waiting.
+  - **When it breaks:**
+    1. *Reading the next batch while the current one is still being checked.* A natural speed-up:
+       start the next `xReadGroup` without waiting for the previous batch's checks to finish.
+       When those checks finish, their `xAck` calls queue behind the blocked read. If the stream
+       is quiet (the pusher only adds every 3 minutes), the acks wait up to 3 minutes, or forever
+       if nothing new is pushed. Unacked messages stay in the pending list and are redelivered
+       to another worker, so sites get checked twice.
+    2. *The worker also writes to Redis.* For example, putting check results on a second stream
+       or queue for a separate DB writer (the plan in the pusher commit message), sending a
+       heartbeat, or caching the last status. Those writes hang until the next website arrives.
+    3. *One process both pushes and reads.* If the pusher and worker are ever merged, or the API
+       imports the package to create consumer groups and also reads, `xAdd` would queue behind
+       the read that is waiting for that very `xAdd`: a deadlock.
+    4. *Shutdown.* `quit()` is also queued behind the blocked read, so Ctrl+C or a deploy restart
+       hangs until a message happens to arrive.
+  - **Fix:** give the blocking read its own connection. node-redis supports this directly:
+    `redisClient.duplicate()` returns a new client with the same settings; `connect()` it and use
+    it only for `xReadGroup`. Everything else (`xAdd`, `xAck`, group creation) stays on the normal
+    client. node-redis v5+ also has `createClientPool()` for running commands on separate
+    connections. (v4's `commandOptions({ isolated: true })` is gone in v5/v6.)
+  - **Mitigation without a second connection:** use a finite block, e.g. `BLOCK: 5000`, and loop.
+    Other commands then wait at most 5 seconds instead of forever. It reduces the problem but
+    doesn't solve it.
