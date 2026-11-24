@@ -1102,6 +1102,16 @@ Several regions let you tell "the site is down" (most regions agree) from "one p
 
 **Sources:** https://modelcontextprotocol.io/introduction · https://docs.claude.com/en/docs/claude-code/mcp · https://www.prisma.io/docs/ai/tools/mcp-server · https://www.prisma.io/blog/search-prisma-docs-from-your-coding-agent · https://github.com/upstash/context7 · https://npmjs.com/package/expressjs-mcp
 
+### P101: arrow function with braces returns nothing (ORM include callback)
+**The problem it solves:** a callback that's meant to hand back a value silently hands back `undefined`, so the caller ignores your work without any error.
+**How it works:** an arrow function has two body forms. **Expression body** `(x) => x.where(...)`: the expression's value is returned automatically. **Block body** `(x) => { x.where(...) }`: the braces make it a list of statements, and nothing is returned unless you write `return`. The ORM's `.include("ticks", (tick) => …)` uses the callback's *return value* as the refined collection, and every ORM call returns a new collection without changing the old one. So `{ tick.where(...) }` built a filtered collection and then threw it away.
+**Worked through (2026-11-24, `GET /user/website/:id`):** I wrote `.include("ticks", (tick: any) => { tick.where((t: any) => t.createdAt.gt(Date.now())) })`. Review pointed out the braces with no `return`. Fixed by dropping the braces so it's an expression body.
+**Gotchas / would have missed:**
+- The `: any` annotations hid it: with inferred types, TypeScript would have complained that the callback returns `void` where a collection is expected. Don't annotate callbacks `any`, let them be inferred.
+- Returning an object literal from an expression body needs parentheses: `() => ({ a: 1 })`. Without them `{ a: 1 }` is read as a block containing a label `a`, and it returns `undefined`.
+- Same trap in `.map(x => { x * 2 })` (array of `undefined`) and in React `.map(item => { <Row /> })` (renders nothing).
+**Connects to:** P54/P52's "the ORM doesn't throw, it just gives you less than you wanted": a silent no-op, not an error. Immutable chaining (each call returns a new collection) is why the result *must* be returned.
+
 ## 3. Jargon
 
 **Project scaffolding**
@@ -1244,6 +1254,8 @@ Several regions let you tell "the site is down" (most regions agree) from "one p
 - **(P44) "MCP gives access to documentation search."** Right but partial. MCP is the protocol for giving an AI *any* tool. Docs search is just one kind of tool a server may offer. Others act on your account (Prisma: create DBs), and "Express MCP" libraries expose *your own* API as tools.
 - **(P3) "`^7` covers all of version 7."** Right: `>=7.0.0 <8.0.0`. The catch is elsewhere: each package's range is hand-written, and the edit only takes effect after `bun install`.
 
+- **(P101) "`(x) => { x.where(...) }` returns the filtered collection."** No. Braces make a block body, which returns `undefined` unless you write `return`. Only the brace-less expression body returns automatically.
+
 ## 5. Failure signatures
 
 - **`TypeError: Cannot destructure property 'x' from null or undefined value` on a POST, 500 + HTML stack trace** → `req.body` is undefined → no body-parsing middleware (`express.json()`) registered before the routes. Confirmed with curl in P52.
@@ -1274,6 +1286,8 @@ Several regions let you tell "the site is down" (most regions agree) from "one p
 - **(P8) Symptom (expected):** `Cannot find name 'Bun'`. **Cause:** TS 6+/7 defaults `types` to `[]`. **Confirm:** goes away after adding `types: ["bun"]`.
 - **(P8) Symptom (expected):** "Relative import paths need explicit file extensions…" on `./routes`. **Cause:** `NodeNext` resolution inherited from base.json.
 - **(P1) Symptom (potential):** `.log` files show up in `git status` even though apps/api/.gitignore has a "logs" section. **Likely cause:** Bun's template writes `_.log` instead of `*.log`. **Confirm:** `git check-ignore -v apps/api/some.log` prints nothing, which means the file isn't ignored.
+
+- **(P101) An ORM `include`/`where` refinement is ignored (all related rows come back, or the filter has no effect), with no error** → the callback has a block body `{ … }` without `return`, so it returns `undefined` → drop the braces or add `return`. `any` on the callback parameter hides the type error that would have caught it.
 
 ## 6. Open questions
 
